@@ -4,6 +4,9 @@ export class SubcategoryDto {
   @ApiProperty({ description: 'Name of the subcategory' })
   name: string;
 
+  @ApiProperty({ example: 'FRUIT-001' })
+  subcategoryCode: string; 
+
   @ApiProperty({ description: 'Description of the subcategory' })
   description?: string;
 
