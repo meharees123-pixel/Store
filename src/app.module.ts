@@ -15,7 +15,7 @@ import { ProductController } from './controllers/product.controller';
 import { ProductService } from './services/product.service';
 @Module({
   imports: [
-    MongooseModule.forRoot('mongodb://localhost:27017/Store'),
+    MongooseModule.forRoot('mongodb://3.91.46.159:27017/Store'),
     MongooseModule.forFeature([
       { name: 'User', schema: UserSchema },
       { name: Category.name, schema: CategorySchema },
