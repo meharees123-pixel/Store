@@ -8,6 +8,11 @@ https://becomegeeks.com/blog/nestjs-building-a-rest-api-web-service-with-mongodb
 
 ```bash
 $ npm install
+nohup npm run start &
+
+screen
+npm run start
+
 ```
 
 ## Running the app

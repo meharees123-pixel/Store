@@ -22,6 +22,10 @@ export class Subcategory extends AuditModel {
   @Prop({ required: true, type: SchemaTypes.ObjectId, ref: Category.name })
   categoryId: string;
 
+  @ApiProperty({ description: 'Unique code for the subcategory', example: 'FRUIT-001' })
+  @Prop({ required: true, unique: true })
+  subcategoryCode: string;
+
   @ApiProperty({ description: 'Image URL for the subcategory' })
   @Prop()
   subcategoryImage?: string;
