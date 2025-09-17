@@ -8,6 +8,9 @@ https://becomegeeks.com/blog/nestjs-building-a-rest-api-web-service-with-mongodb
 
 ```bash
 $ npm install
+npm run build
+pm2 restart store-api
+pm2 start dist/main.js --name store-api -f
 nohup npm run start &
 
 screen
