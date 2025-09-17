@@ -19,6 +19,10 @@ export class AuditModel {
   @ApiProperty({ description: 'ID of the user who last updated the document' })
   @Prop({ type: SchemaTypes.ObjectId, ref: 'User' })
   updatedBy: string;
+
+  @ApiProperty({ description: 'Indicates whether the document is active', example: true })
+  @Prop({ type: Boolean, default: true })
+  isActive: boolean;
 }
 
 export const AuditSchema = SchemaFactory.createForClass(AuditModel);

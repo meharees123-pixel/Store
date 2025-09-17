@@ -18,11 +18,14 @@ export class ProductDto {
 
   @ApiProperty({ description: 'Parent subcategory ID', example: '68c467b88f1124a8b0fcd2b3' })
   subcategoryId?: string;
+
+  @ApiProperty()
+  isActive: boolean;
 }
 
-export class CreateProductDto extends ProductDto {}
+export class CreateProductDto extends ProductDto { }
 
-export class UpdateProductDto extends ProductDto {}
+export class UpdateProductDto extends ProductDto { }
 
 export class ProductResponseDto extends ProductDto {
   @ApiProperty({ description: 'MongoDB document ID' })

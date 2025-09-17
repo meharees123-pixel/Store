@@ -18,4 +18,7 @@ export class UserDto {
   @IsNotEmpty()
   @MinLength(8)
   password: string;
+
+  @ApiProperty()
+  isActive: boolean;
 }

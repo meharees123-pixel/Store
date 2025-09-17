@@ -13,6 +13,16 @@ export class CategoryDto {
 
   @ApiProperty({ description: 'Image URL associated with the category' })
   categoryImage?: string;
+
+  @ApiProperty({
+    description: 'Store ID to which this category belongs',
+    example: '64f1c2d9e4b1a2a3c1d2e3f4',
+  })
+  storeId: string;
+
+  @ApiProperty()
+  isActive: boolean;
+
 }
 
 // Create DTO (requires name and categoryCode)
@@ -25,7 +35,7 @@ export class CreateCategoryDto extends CategoryDto {
 }
 
 // Update DTO allows partial updates
-export class UpdateCategoryDto extends CategoryDto {}
+export class UpdateCategoryDto extends CategoryDto { }
 
 // Response DTO includes MongoDB metadata
 export class CategoryResponseDto extends CategoryDto {
