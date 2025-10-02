@@ -25,7 +25,7 @@ import { StoreService } from '../services/store.service';
 import { AuthGuard } from '../guards/auth.guard';
 
 @ApiTags('stores')
-@ApiBearerAuth()
+@UseGuards(AuthGuard)
 @Controller('stores')
 export class StoreController {
   constructor(private readonly storeService: StoreService) {}
@@ -34,7 +34,6 @@ export class StoreController {
    * Create a new store (requires authentication)
    */
   @Post()
-  //@UseGuards(AuthGuard)
   @ApiOperation({ summary: 'Create a new store' })
   @ApiResponse({ status: 201, type: StoreResponseDto })
   @ApiBody({ type: CreateStoreDto })
@@ -76,7 +75,6 @@ export class StoreController {
    * Update store by ID (requires authentication)
    */
   @Put(':id')
-  //@UseGuards(AuthGuard)
   @ApiOperation({ summary: 'Update store by ID' })
   @ApiParam({
     name: 'id',
@@ -106,7 +104,6 @@ export class StoreController {
    * Delete store by ID (requires authentication)
    */
   @Delete(':id')
-  //@UseGuards(AuthGuard)
   @ApiOperation({ summary: 'Delete store by ID' })
   @ApiParam({
     name: 'id',

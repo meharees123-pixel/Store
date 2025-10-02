@@ -26,7 +26,9 @@ import {
 import { SubcategoryService } from '../services/subcategory.service';
 import { AuthGuard } from '../guards/auth.guard';
 import { UseGuards } from '@nestjs/common';
+
 @ApiTags('subcategories')
+@UseGuards(AuthGuard)
 @Controller('subcategories')
 export class SubcategoryController {
     constructor(private readonly subcategoryService: SubcategoryService) { }

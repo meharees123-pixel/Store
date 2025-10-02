@@ -6,6 +6,7 @@ import {
   Param,
   Put,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { ParseObjectIdPipe } from '../utils/parse-object-id.pipe';
 import { ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
@@ -17,8 +18,10 @@ import {
 import { CategoryService } from '../services/category.service';
 import { ProductService } from '../services/product.service';
 import { ProductResponseDto } from 'src/dto/product.dto';
+import { AuthGuard } from 'src/guards/auth.guard';
 
 @ApiTags('categories')
+@UseGuards(AuthGuard)
 @Controller('categories')
 export class CategoryController {
   constructor(private readonly categoryService: CategoryService,

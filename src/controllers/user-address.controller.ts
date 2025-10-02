@@ -6,6 +6,7 @@ import {
   Param,
   Put,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { ParseObjectIdPipe } from '../utils/parse-object-id.pipe';
 import { ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
@@ -15,7 +16,9 @@ import {
   UserAddressResponseDto,
 } from '../dto/user-address.dto';
 import { UserAddressService } from '../services/user-address.service';
+import { AuthGuard } from '../guards/auth.guard';
 
+@UseGuards(AuthGuard)
 @ApiTags('user-addresses')
 @Controller('user-addresses')
 export class UserAddressController {

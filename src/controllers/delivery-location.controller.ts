@@ -6,6 +6,7 @@ import {
   Param,
   Put,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { ParseObjectIdPipe } from '../utils/parse-object-id.pipe';
 import { ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
@@ -15,8 +16,10 @@ import {
   DeliveryLocationResponseDto,
 } from '../dto/delivery-location.dto';
 import { DeliveryLocationService } from '../services/delivery-location.service';
+import { AuthGuard } from 'src/guards/auth.guard';
 
 @ApiTags('delivery-locations')
+@UseGuards(AuthGuard)
 @Controller('delivery-locations')
 export class DeliveryLocationController {
   constructor(private readonly locationService: DeliveryLocationService) {}
