@@ -13,6 +13,9 @@ export class ProductDto {
   @ApiProperty({ description: 'Product image URL' })
   productImage?: string;
 
+  @ApiProperty({ description: 'Available quantity in stock', example: 100 })
+  quantity: number;
+
   @ApiProperty({ description: 'Parent category ID', example: '68c467b88f1124a8b0fcd2b3' })
   categoryId: string;
 

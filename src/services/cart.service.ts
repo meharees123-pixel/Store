@@ -1,43 +1,76 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import {
-  CreateCartDto,
-  UpdateCartDto,
-} from '../dto/cart.dto';
+import { CreateCartDto, UpdateCartDto } from '../dto/cart.dto';
 import { Cart } from '../models/cart.model';
+import { Product } from '../models/product.model';
 
 @Injectable()
 export class CartService {
-  constructor(
-    @InjectModel(Cart.name)
-    private readonly cartModel: Model<Cart & Document>,
-  ) {}
+    constructor(
+        @InjectModel(Cart.name)
+        private readonly cartModel: Model<Cart & Document>,
 
-  async create(dto: CreateCartDto): Promise<Cart & Document> {
-    return this.cartModel.create(dto);
-  }
+        @InjectModel(Product.name)
+        private readonly productModel: Model<Product & Document>,
+    ) { }
 
-  async findAll(): Promise<Cart[]> {
-    return this.cartModel.find().exec();
-  }
+    async create(dto: CreateCartDto): Promise<Cart & Document> {
+        const product = await this.productModel.findById(dto.productId).exec();
 
-  async findByUser(userId: string): Promise<Cart[]> {
-    return this.cartModel.find({ userId }).exec();
-  }
+        if (!product) {
+            throw new NotFoundException('Product not found');
+        }
 
-  async findOne(id: string): Promise<Cart & Document> {
-    return this.cartModel.findById(id).exec();
-  }
+        if (product.quantity <= 0) {
+            throw new BadRequestException('Product is out of stock');
+        }
 
-  async update(id: string, dto: UpdateCartDto): Promise<Cart & Document> {
-    return this.cartModel
-      .findByIdAndUpdate(id, dto, { new: true, runValidators: true })
-      .exec();
-  }
+        // Optional: Validate requested quantity vs available stock
+        if (dto.quantity > product.quantity) {
+            throw new BadRequestException(`Only ${product.quantity} units available`);
+        }
 
-  async delete(id: string): Promise<{ deleted: boolean }> {
-    const deleted = await this.cartModel.findByIdAndDelete(id).exec();
-    return { deleted: !!deleted };
-  }
+        return this.cartModel.create(dto);
+    }
+
+    async findAll(): Promise<Cart[]> {
+        return this.cartModel.find().exec();
+    }
+
+    async findByUser(userId: string): Promise<Cart[]> {
+        return this.cartModel.find({ userId }).exec();
+    }
+
+    async findOne(id: string): Promise<Cart & Document> {
+        return this.cartModel.findById(id).exec();
+    }
+
+    async update(id: string, dto: UpdateCartDto): Promise<Cart & Document> {
+        const product = await this.productModel.findById(dto.productId).exec();
+
+        if (!product) {
+            throw new NotFoundException('Product not found');
+        }
+
+        if (product.quantity <= 0) {
+            throw new BadRequestException('Product is out of stock');
+        }
+
+        if (dto.quantity > product.quantity) {
+            throw new BadRequestException(`Only ${product.quantity} units available`);
+        }
+
+        return this.cartModel
+            .findByIdAndUpdate(id, dto, {
+                new: true,
+                runValidators: true,
+            })
+            .exec();
+    }
+
+    async delete(id: string): Promise<{ deleted: boolean }> {
+        const deleted = await this.cartModel.findByIdAndDelete(id).exec();
+        return { deleted: !!deleted };
+    }
 }
