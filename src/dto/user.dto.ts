@@ -1,24 +1,17 @@
-import { IsString, IsEmail, MinLength, IsNotEmpty, ValidateNested } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
-export class UserDto {
+export class FirebaseLoginDto {
+  @ApiProperty({ example: '+97412345678' })
+  mobileNumber: string;
 
-  @ApiProperty()
-  @IsNotEmpty()
-  @IsString()
-  name: string;
+  @ApiProperty({ example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' })
+  firebaseToken: string;
 
-  @ApiProperty()
-  @IsEmail()
-  @IsNotEmpty()
-  email: string;
+  @ApiProperty({ required: false, example: 'Meharees' })
+  name?: string;
+}
 
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(8)
-  password: string;
-
-  @ApiProperty()
-  isActive: boolean;
+export class FirebaseLogoutDto {
+  @ApiProperty({ example: '+97412345678' })
+  mobileNumber: string;
 }

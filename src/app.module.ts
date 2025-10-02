@@ -42,6 +42,8 @@ import { AppSettings, AppSettingsSchema } from './models/app-settings.model';
 import { AppSettingsController } from './controllers/app-settings.controller';
 import { AppSettingsService } from './services/app-settings.service';
 
+import { AuthGuard } from './guards/auth.guard';
+
 @Module({
   imports: [
     MongooseModule.forRoot('mongodb://3.91.46.159:27017/Store'),
@@ -82,6 +84,7 @@ import { AppSettingsService } from './services/app-settings.service';
     CartService,
     OrderService,
     AppSettingsService,
+    AuthGuard
   ],
 })
 export class AppModule {}

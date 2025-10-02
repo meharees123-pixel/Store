@@ -6,6 +6,7 @@ import {
   Param,
   Put,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { ParseObjectIdPipe } from '../utils/parse-object-id.pipe';
 import { ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
@@ -15,8 +16,10 @@ import {
   CartResponseDto,
 } from '../dto/cart.dto';
 import { CartService } from '../services/cart.service';
+import { AuthGuard } from 'src/guards/auth.guard';
 
 @ApiTags('cart')
+@UseGuards(AuthGuard)
 @Controller('cart')
 export class CartController {
   constructor(private readonly cartService: CartService) {}

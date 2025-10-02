@@ -1,26 +1,25 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
-import { UserService } from '../services/user.service';
-import { UserDto } from '../dto/user.dto';
-import { User } from '../models/user.model';
+import { Controller, Post, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { ValidationPipe } from '../utils/validation.pipe';
+import { UserService } from '../services/user.service';
+import { FirebaseLoginDto, FirebaseLogoutDto } from '../dto/user.dto';
+import { User } from '../models/user.model';
 
-@ApiTags('users')
-@Controller('users')
+@ApiTags('auth')
+@Controller('auth')
 export class UserController {
   constructor(private readonly userService: UserService) {}
 
-  @ApiOperation({ summary: 'Create User' })
-  @ApiResponse({ status: 201, description: 'Returns created user', type: User })
-  @Post()
-  async createUser(@Body(new ValidationPipe()) userDto: UserDto): Promise<User> {
-    return this.userService.createUser(userDto);
+  @Post('firebase-login')
+  @ApiOperation({ summary: 'Login or register user via Firebase token' })
+  @ApiResponse({ status: 200, type: User })
+  firebaseLogin(@Body() dto: FirebaseLoginDto) {
+    return this.userService.firebaseLogin(dto);
   }
 
-  @ApiOperation({ summary: 'Get all users' })
-  @ApiResponse({ status: 200, description: 'Creates a new user', type: User })
-  @Get()
-  async findAllUsers(): Promise<User[]> {
-    return this.userService.findAllUsers();
+  @Post('firebase-logout')
+  @ApiOperation({ summary: 'Logout user by clearing Firebase token' })
+  @ApiResponse({ status: 200, type: Object })
+  firebaseLogout(@Body() dto: FirebaseLogoutDto) {
+    return this.userService.firebaseLogout(dto);
   }
 }

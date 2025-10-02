@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Put,
+  UseGuards,
 } from '@nestjs/common';
 import { ParseObjectIdPipe } from '../utils/parse-object-id.pipe';
 import { ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
@@ -14,8 +15,10 @@ import {
   OrderResponseDto,
 } from '../dto/order.dto';
 import { OrderService } from '../services/order.service';
+import { AuthGuard } from 'src/guards/auth.guard';
 
 @ApiTags('orders')
+@UseGuards(AuthGuard)
 @Controller('orders')
 export class OrderController {
   constructor(private readonly orderService: OrderService) {}

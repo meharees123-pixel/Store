@@ -6,6 +6,7 @@ import {
   Param,
   Put,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { ParseObjectIdPipe } from '../utils/parse-object-id.pipe';
 import { ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
@@ -15,8 +16,10 @@ import {
   AppSettingsResponseDto,
 } from '../dto/app-settings.dto';
 import { AppSettingsService } from '../services/app-settings.service';
+import { AuthGuard } from 'src/guards/auth.guard';
 
 @ApiTags('app-settings')
+@UseGuards(AuthGuard)
 @Controller('app-settings')
 export class AppSettingsController {
   constructor(private readonly appSettingsService: AppSettingsService) {}
