@@ -23,6 +23,11 @@ export class Product extends AuditModel {
   @Prop()
   productImage?: string;
 
+  @ApiProperty({ description: 'Available quantity in stock', example: 100 })
+  @Prop({ required: true, default: 0 })
+  quantity: number;
+
+
   @ApiProperty({ description: 'Reference to parent category', example: '68c467b88f1124a8b0fcd2b3' })
   @Prop({ required: true, type: SchemaTypes.ObjectId, ref: Category.name })
   categoryId: string;

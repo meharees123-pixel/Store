@@ -34,6 +34,10 @@ import { Cart, CartSchema } from './models/cart.model';
 import { CartController } from './controllers/cart.controller';
 import { CartService } from './services/cart.service';
 
+import { Order, OrderSchema } from './models/order.model';
+import { OrderController } from './controllers/order.controller';
+import { OrderService } from './services/order.service';
+
 @Module({
   imports: [
     MongooseModule.forRoot('mongodb://3.91.46.159:27017/Store'),
@@ -46,6 +50,7 @@ import { CartService } from './services/cart.service';
       { name: DeliveryLocation.name, schema: DeliveryLocationSchema },
       { name: UserAddress.name, schema: UserAddressSchema },
       { name: Cart.name, schema: CartSchema },
+      { name: Order.name, schema: OrderSchema },
     ]),
     AuthModule,
   ],
@@ -58,6 +63,7 @@ import { CartService } from './services/cart.service';
     DeliveryLocationController,
     UserAddressController,
     CartController,
+    OrderController,
   ],
   providers: [
     UserService,
@@ -68,6 +74,7 @@ import { CartService } from './services/cart.service';
     DeliveryLocationService,
     UserAddressService,
     CartService,
+    OrderService,
   ],
 })
 export class AppModule {}
