@@ -1,21 +1,28 @@
-import { 
-  Controller, 
-  Post, 
-  Body, 
-  Get, 
-  Param, 
-  Put, 
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  Param,
+  Put,
   Delete,
 } from '@nestjs/common';
 import { ParseObjectIdPipe } from '../utils/parse-object-id.pipe';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { CreateCategoryDto, UpdateCategoryDto, CategoryResponseDto } from '../dto/category.dto';
+import { ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
+import {
+  CreateCategoryDto,
+  UpdateCategoryDto,
+  CategoryResponseDto,
+} from '../dto/category.dto';
 import { CategoryService } from '../services/category.service';
+import { ProductService } from '../services/product.service';
+import { ProductResponseDto } from 'src/dto/product.dto';
 
 @ApiTags('categories')
 @Controller('categories')
 export class CategoryController {
-  constructor(private readonly categoryService: CategoryService) {}
+  constructor(private readonly categoryService: CategoryService,
+    private readonly productService: ProductService) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new category' })
@@ -54,4 +61,20 @@ export class CategoryController {
   delete(@Param('id', new ParseObjectIdPipe()) id: string) {
     return this.categoryService.delete(id);
   }
+
+  @Get('dashboard-categories/:storeId')
+  @ApiOperation({ summary: 'Get dashboard categories based on app settings' })
+  @ApiParam({ name: 'storeId', example: '652f1c2d9e4b1a2a3c1d2e3f4' })
+  @ApiResponse({ status: 200, type: [CategoryResponseDto] })
+  getDashboardCategories(@Param('storeId', new ParseObjectIdPipe()) storeId: string) {
+    return this.categoryService.getDashboardCategories(storeId);
+  }
+
+  @Get('dashboard-products/:storeId')
+@ApiOperation({ summary: 'Get dashboard products based on category codes from app settings' })
+@ApiParam({ name: 'storeId', example: '652f1c2d9e4b1a2a3c1d2e3f4' })
+@ApiResponse({ status: 200, type: [ProductResponseDto] })
+getDashboardProducts(@Param('storeId', new ParseObjectIdPipe()) storeId: string) {
+  return this.productService.getDashboardProducts(storeId);
+}
 }

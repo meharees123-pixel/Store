@@ -7,12 +7,17 @@ import {
   CategoryResponseDto 
 } from '../dto/category.dto';
 import { Category } from '../models/category.model';
+import { AppSettings } from '../models/app-settings.model';
 
 @Injectable()
 export class CategoryService {
   constructor(
-    @InjectModel(Category.name) 
+    @InjectModel(Category.name)
     private readonly categoryModel: Model<Category & Document>,
+
+    @InjectModel(AppSettings.name)
+    private readonly appSettingsModel: Model<AppSettings & Document>
+
   ) {}
 
   async create(createCategoryDto: CreateCategoryDto): Promise<Category & Document> {
@@ -43,4 +48,14 @@ export class CategoryService {
     const deletedDocument = await this.categoryModel.findByIdAndDelete(id).exec();
     return { deleted: !!deletedDocument };
   }
+
+  async getDashboardCategories(storeId: string): Promise<Category[]> {
+  const setting = await this.appSettingsModel.findOne({ key: 'dashboardCategoryCodes' }).exec();
+  if (!setting || !Array.isArray(setting.value)) return [];
+
+  return this.categoryModel.find({
+    storeId,
+    categoryCode: { $in: setting.value },
+  }).exec();
+}
 }

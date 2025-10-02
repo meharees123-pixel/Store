@@ -26,6 +26,7 @@ export class ProductDto {
   isActive: boolean;
 }
 
+
 export class CreateProductDto extends ProductDto { }
 
 export class UpdateProductDto extends ProductDto { }
@@ -39,4 +40,24 @@ export class ProductResponseDto extends ProductDto {
 
   @ApiProperty()
   updatedAt: Date;
+}
+
+export class DashboardProductCategoryDto {
+  @ApiProperty({ example: '652f1c2d9e4b1a2a3c1d2e3f4' })
+  _id: string;
+
+  @ApiProperty({ example: 'Fruits' })
+  name: string;
+
+  @ApiProperty({ example: 'FRUIT' })
+  code: string;
+
+  @ApiProperty({ example: 'https://cdn.example.com/images/fruits.jpg' })
+  image?: string;
+
+  @ApiProperty({ example: 'Fresh and seasonal fruits' })
+  description?: string;
+
+  @ApiProperty({ type: [ProductResponseDto] })
+  products: ProductResponseDto[];
 }
