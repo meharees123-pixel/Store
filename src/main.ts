@@ -1,9 +1,16 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const httpsOptions = {
+    key: readFileSync(join(__dirname, '..', 'ssl', 'server.key')),
+    cert: readFileSync(join(__dirname, '..', 'ssl', 'server.cert')),
+  };
+
+  const app = await NestFactory.create(AppModule, { httpsOptions });
 
   const config = new DocumentBuilder()
     .setTitle('Store API')
@@ -17,18 +24,16 @@ async function bootstrap() {
         name: 'Authorization',
         in: 'header',
       },
-      'access-token', // This name must match @ApiBearerAuth('access-token')
+      'access-token',
     )
     .addTag('users')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-
-  // Apply global security scheme
   document.security = [{ 'access-token': [] }];
 
   SwaggerModule.setup('api-docs', app, document);
 
-  await app.listen(3000);
+  await app.listen(443);
 }
 bootstrap();
