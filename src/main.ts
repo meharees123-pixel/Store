@@ -5,12 +5,20 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 async function bootstrap() {
-  const httpsOptions = {
-    key: readFileSync(join(__dirname, '..', 'ssl', 'server.key')),
-    cert: readFileSync(join(__dirname, '..', 'ssl', 'server.cert')),
-  };
+  const isHttps = process.env.HTTPS === 'true';
+  const port = parseInt(process.env.PORT || (isHttps ? '443' : '3000'), 10);
 
-  const app = await NestFactory.create(AppModule, { httpsOptions });
+  const httpsOptions =
+    isHttps && process.env.SSL_ENABLED === 'true'
+      ? {
+          key: readFileSync(join(__dirname, '..', 'ssl', 'server.key')),
+          cert: readFileSync(join(__dirname, '..', 'ssl', 'server.cert')),
+        }
+      : undefined;
+
+  const app = await NestFactory.create(AppModule, {
+    ...(httpsOptions && { httpsOptions }),
+  });
 
   const config = new DocumentBuilder()
     .setTitle('Store API')
@@ -34,6 +42,6 @@ async function bootstrap() {
 
   SwaggerModule.setup('api-docs', app, document);
 
-  await app.listen(443);
+  await app.listen(port);
 }
 bootstrap();
