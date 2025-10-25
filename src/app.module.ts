@@ -46,7 +46,9 @@ import { AuthGuard } from './guards/auth.guard';
 //iQlUh3tTQkqfJ4A1
 @Module({
   imports: [
-    MongooseModule.forRoot('mongodb+srv://meharees123_db_user:iQlUh3tTQkqfJ4A1@supercateen.kwlsffa.mongodb.net/?retryWrites=true&w=majority&appName=SuperCateen'),
+    MongooseModule.forRoot(
+      'mongodb+srv://meharees123_db_user:iQlUh3tTQkqfJ4A1@supercateen.kwlsffa.mongodb.net/Store?retryWrites=true&w=majority&appName=SuperCateen',
+    ),
     MongooseModule.forFeature([
       { name: 'User', schema: UserSchema },
       { name: Store.name, schema: StoreSchema },
@@ -87,4 +89,4 @@ import { AuthGuard } from './guards/auth.guard';
     AuthGuard
   ],
 })
-export class AppModule {}
+export class AppModule { }
