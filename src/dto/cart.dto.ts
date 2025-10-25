@@ -18,13 +18,13 @@ export class CartDto {
     @ApiProperty({ example: 2 })
     quantity: number;
 
-    @ApiProperty({ example: 19.99 })
+    @ApiProperty({ required: false ,example: 19.99 })
     unitPrice: number;
 
-    @ApiProperty({ example: 39.98 })
+    @ApiProperty({ required: false ,example: 39.98 })
     totalPrice: number;
 
-    @ApiProperty()
+    @ApiProperty({ required: false })
     isActive: boolean;
 }
 

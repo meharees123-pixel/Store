@@ -47,7 +47,6 @@ export class SubcategoryService {
     try {
       const subcategories = await this.subcategoryModel
         .find({ categoryId })
-        .populate('categoryId')
         .exec();
 
       return subcategories;
