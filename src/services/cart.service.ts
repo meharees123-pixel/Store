@@ -15,34 +15,34 @@ export class CartService {
         private readonly productModel: Model<Product & Document>,
     ) { }
 
-async create(dto: CreateCartDto): Promise<Cart & Document> {
-  const product = await this.productModel.findById(dto.productId).exec();
+    async create(dto: CreateCartDto): Promise<Cart & Document> {
+        const product = await this.productModel.findById(dto.productId).exec();
 
-  if (!product) {
-    throw new NotFoundException('Product not found');
-  }
+        if (!product) {
+            throw new NotFoundException('Product not found');
+        }
 
-  if (product.quantity <= 0) {
-    throw new BadRequestException('Product is out of stock');
-  }
+        if (product.quantity <= 0) {
+            throw new BadRequestException('Product is out of stock');
+        }
 
-  if (dto.quantity > product.quantity) {
-    throw new BadRequestException(`Only ${product.quantity} units available`);
-  }
+        if (dto.quantity > product.quantity) {
+            throw new BadRequestException(`Only ${product.quantity} units available`);
+        }
 
-  const cartItem = new this.cartModel({
-    userId: dto.userId,
-    userAddressId: dto.addressId,
-    productId: dto.productId,
-    quantity: dto.quantity,
-    unitPrice: product.price,
-    totalPrice: product.price * dto.quantity,
-    categoryId: product.categoryId,
-    subcategoryId: product.subcategoryId,
-  });
+        const cartItem = new this.cartModel({
+            userId: dto.userId,
+            userAddressId: dto.addressId,
+            productId: dto.productId,
+            quantity: dto.quantity,
+            unitPrice: product.price,
+            totalPrice: product.price * dto.quantity,
+            categoryId: product.categoryId,
+            subcategoryId: product.subcategoryId,
+        });
 
-  return cartItem.save();
-}
+        return cartItem.save();
+    }
 
     async findAll(): Promise<Cart[]> {
         return this.cartModel.find().exec();
@@ -71,12 +71,26 @@ async create(dto: CreateCartDto): Promise<Cart & Document> {
             throw new BadRequestException(`Only ${product.quantity} units available`);
         }
 
-        return this.cartModel
-            .findByIdAndUpdate(id, dto, {
-                new: true,
-                runValidators: true,
-            })
-            .exec();
+        const updatedCart = await this.cartModel.findByIdAndUpdate(
+            id,
+            {
+                userId: dto.userId,
+                userAddressId: dto.addressId,
+                productId: dto.productId,
+                quantity: dto.quantity,
+                unitPrice: product.price,
+                totalPrice: product.price * dto.quantity,
+                categoryId: product.categoryId,
+                subcategoryId: product.subcategoryId,
+            },
+            { new: true, runValidators: true },
+        ).exec();
+
+        if (!updatedCart) {
+            throw new NotFoundException(`Cart item with ID ${id} not found`);
+        }
+
+        return updatedCart;
     }
 
     async delete(id: string): Promise<{ deleted: boolean }> {
