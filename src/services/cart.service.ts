@@ -32,7 +32,7 @@ async create(dto: CreateCartDto): Promise<Cart & Document> {
 
   const cartItem = new this.cartModel({
     userId: dto.userId,
-    userAddressId: dto.userAddressId,
+    userAddressId: dto.addressId,
     productId: dto.productId,
     quantity: dto.quantity,
     unitPrice: product.price,

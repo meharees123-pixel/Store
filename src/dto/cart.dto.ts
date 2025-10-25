@@ -4,7 +4,7 @@ export class CartDto {
     userId: string;
 
     @ApiProperty({ required: false })
-    userAddressId?: string;
+    addressId?: string;
 
     @ApiProperty({ required: false })
     categoryId?: string;
