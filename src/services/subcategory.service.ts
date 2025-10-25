@@ -1,6 +1,7 @@
 import {
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -13,7 +14,6 @@ import {
   Subcategory,
   SubcategoryDocument,
 } from '../models/subcategory.model';
-import { User } from '../models/user.model'; // Import your User model
 
 @Injectable()
 export class SubcategoryService {
@@ -44,17 +44,30 @@ export class SubcategoryService {
   }
 
   async findByCategoryId(categoryId: string): Promise<SubcategoryDocument[]> {
-    return this.subcategoryModel
-      .find({ categoryId: categoryId })
-      .populate('categoryId')
-      .exec();
+    try {
+      const subcategories = await this.subcategoryModel
+        .find({ categoryId })
+        .populate('categoryId')
+        .exec();
+
+      return subcategories;
+    } catch (error) {
+      console.error('Find by categoryId error:', error);
+      throw new InternalServerErrorException('Error fetching subcategories');
+    }
   }
 
   async findOne(id: string): Promise<SubcategoryDocument> {
-    return this.subcategoryModel
+    const subcategory = await this.subcategoryModel
       .findById(id)
       .populate('categoryId')
       .exec();
+
+    if (!subcategory) {
+      throw new NotFoundException(`Subcategory with ID ${id} not found`);
+    }
+
+    return subcategory;
   }
 
   async update(
@@ -62,7 +75,7 @@ export class SubcategoryService {
     updateSubcategoryDto: UpdateSubcategoryDto,
     userId: string,
   ): Promise<SubcategoryDocument> {
-    return this.subcategoryModel
+    const updated = await this.subcategoryModel
       .findByIdAndUpdate(
         id,
         { ...updateSubcategoryDto, updatedBy: userId },
@@ -70,12 +83,19 @@ export class SubcategoryService {
       )
       .populate('categoryId')
       .exec();
+
+    if (!updated) {
+      throw new NotFoundException(`Subcategory with ID ${id} not found`);
+    }
+
+    return updated;
   }
 
   async delete(id: string): Promise<{ deleted: boolean }> {
     const deletedDocument = await this.subcategoryModel
       .findByIdAndDelete(id)
       .exec();
+
     return { deleted: !!deletedDocument };
   }
 }

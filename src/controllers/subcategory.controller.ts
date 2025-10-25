@@ -77,4 +77,12 @@ export class SubcategoryController {
     delete(@Param('id', new ParseObjectIdPipe()) id: string) {
         return this.subcategoryService.delete(id);
     }
+
+    @Get('/category/:categoryId')
+    @ApiOperation({ summary: 'Get all subcategories by category ID' })
+    @ApiResponse({ status: 200, type: [SubcategoryResponseDto] })
+    findByCategoryId(@Param('categoryId', ParseObjectIdPipe) categoryId: string) {
+    return this.subcategoryService.findByCategoryId(categoryId);
+    }
+
 }
