@@ -43,10 +43,10 @@ import { AppSettingsController } from './controllers/app-settings.controller';
 import { AppSettingsService } from './services/app-settings.service';
 
 import { AuthGuard } from './guards/auth.guard';
-
+//iQlUh3tTQkqfJ4A1
 @Module({
   imports: [
-    MongooseModule.forRoot('mongodb://3.91.46.159:27017/Store'),
+    MongooseModule.forRoot('mongodb+srv://meharees123_db_user:iQlUh3tTQkqfJ4A1@supercateen.kwlsffa.mongodb.net/?retryWrites=true&w=majority&appName=SuperCateen'),
     MongooseModule.forFeature([
       { name: 'User', schema: UserSchema },
       { name: Store.name, schema: StoreSchema },

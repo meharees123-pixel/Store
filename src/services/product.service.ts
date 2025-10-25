@@ -101,7 +101,7 @@ export class ProductService {
     }
 
     async getDashboardProducts(storeId: string): Promise<any[]> {
-        const setting = await this.appSettingsModel.findOne({ key: 'dashboardCategoryCodes' }).exec();
+        const setting = await this.appSettingsModel.findOne({ key: 'dashboardProductCategories' }).exec();
         if (!setting || !Array.isArray(setting.value)) return [];
 
         // Step 1: Get categories by code
