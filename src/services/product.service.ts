@@ -27,17 +27,17 @@ import { Subcategory } from '../models/subcategory.model';
 @Injectable()
 export class ProductService {
     constructor(
-    @InjectModel(Product.name)
-    private readonly productModel: Model<ProductDocument>,
+        @InjectModel(Product.name)
+        private readonly productModel: Model<ProductDocument>,
 
-    @InjectModel(AppSettings.name)
-    private readonly appSettingsModel: Model<AppSettings & Document>,
+        @InjectModel(AppSettings.name)
+        private readonly appSettingsModel: Model<AppSettings & Document>,
 
-    @InjectModel(Category.name)
-    private readonly categoryModel: Model<Category & Document>,
+        @InjectModel(Category.name)
+        private readonly categoryModel: Model<Category & Document>,
 
-    @InjectModel(Subcategory.name)
-    private readonly subcategoryModel: Model<Subcategory & Document>,
+        @InjectModel(Subcategory.name)
+        private readonly subcategoryModel: Model<Subcategory & Document>,
     ) { }
 
     async create(
@@ -102,10 +102,18 @@ export class ProductService {
 
     async getDashboardProducts(storeId: string): Promise<any[]> {
         const setting = await this.appSettingsModel.findOne({ key: 'dashboardProductCategories' }).exec();
-        if (!setting || !Array.isArray(setting.value)) return [];
+        if (!setting || typeof setting.value !== 'string') return [];
+
+        let categoryCodes: string[];
+        try {
+            categoryCodes = JSON.parse(setting.value);
+        } catch (err) {
+            console.error("Failed to parse AppSettings value:", err);
+            return [];
+        }
 
         // Step 1: Get categories by code
-        const categories = await this.categoryModel.find({ code: { $in: setting.value } }).exec();
+        const categories = await this.categoryModel.find({ categoryCode: { $in: categoryCodes } }).exec();
         const categoryIds = categories.map(c => c._id);
 
         // Step 2: Get subcategories under those categories
