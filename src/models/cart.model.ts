@@ -18,10 +18,6 @@ export class Cart extends AuditModel {
   @Prop({ type: SchemaTypes.ObjectId, ref: UserAddress.name })
   userAddressId: string;
 
-  @ApiProperty({ description: 'Category ID of the product' })
-  @Prop({ type: SchemaTypes.ObjectId, ref: Category.name })
-  categoryId: string;
-
   @ApiProperty({ description: 'Subcategory ID of the product' })
   @Prop({ type: SchemaTypes.ObjectId, ref: Subcategory.name })
   subcategoryId: string;
