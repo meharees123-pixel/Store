@@ -3,7 +3,7 @@ import { Document, SchemaTypes } from 'mongoose';
 import { ApiProperty } from '@nestjs/swagger';
 import { AuditModel, AuditSchema } from './audit.model';
 import { User } from './user.model';
-import { UserAddress } from './user-address.model';
+import { DeliveryLocation } from './delivery-location.model';
 import { Category } from './category.model';
 import { Subcategory } from './subcategory.model';
 import { Product } from './product.model';
@@ -15,8 +15,8 @@ export class Cart extends AuditModel {
   userId: string;
 
   @ApiProperty({ description: 'User address ID for delivery' })
-  @Prop({ type: SchemaTypes.ObjectId, ref: UserAddress.name })
-  userAddressId: string;
+  @Prop({ type: SchemaTypes.ObjectId, ref: DeliveryLocation.name })
+  addressId: string;
 
   @ApiProperty({ description: 'Subcategory ID of the product' })
   @Prop({ type: SchemaTypes.ObjectId, ref: Subcategory.name })
