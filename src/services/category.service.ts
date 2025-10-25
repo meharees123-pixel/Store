@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { 
-  CreateCategoryDto, 
-  UpdateCategoryDto, 
-  CategoryResponseDto 
+import {
+  CreateCategoryDto,
+  UpdateCategoryDto,
+  CategoryResponseDto
 } from '../dto/category.dto';
 import { Category } from '../models/category.model';
 import { AppSettings } from '../models/app-settings.model';
@@ -18,7 +18,7 @@ export class CategoryService {
     @InjectModel(AppSettings.name)
     private readonly appSettingsModel: Model<AppSettings & Document>
 
-  ) {}
+  ) { }
 
   async create(createCategoryDto: CreateCategoryDto): Promise<Category & Document> {
     return this.categoryModel.create(createCategoryDto);
@@ -33,7 +33,7 @@ export class CategoryService {
   }
 
   async update(
-    id: string, 
+    id: string,
     updateCategoryDto: UpdateCategoryDto,
   ): Promise<Category & Document> {
     return this.categoryModel
@@ -50,12 +50,24 @@ export class CategoryService {
   }
 
   async getDashboardCategories(storeId: string): Promise<Category[]> {
-  const setting = await this.appSettingsModel.findOne({ key: 'dashboardCategoryCodes' }).exec();
-  if (!setting || !Array.isArray(setting.value)) return [];
+    const setting = await this.appSettingsModel.findOne({ key: 'dashboardCategoryCodes' }).exec();
+    console.log("settings1", setting);
 
-  return this.categoryModel.find({
-    storeId,
-    categoryCode: { $in: setting.value },
-  }).exec();
-}
+    if (!setting || typeof setting.value !== 'string') return [];
+
+    let categoryCodes: string[];
+    try {
+      categoryCodes = JSON.parse(setting.value);
+    } catch (err) {
+      console.error("Failed to parse AppSettings value:", err);
+      return [];
+    }
+
+    console.log("Parsed category codes:", categoryCodes);
+
+    return this.categoryModel.find({
+      storeId,
+      categoryCode: { $in: categoryCodes },
+    }).exec();
+  }
 }
