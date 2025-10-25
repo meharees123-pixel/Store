@@ -6,12 +6,6 @@ export class CartDto {
     @ApiProperty({ required: false })
     addressId?: string;
 
-    @ApiProperty({ required: false })
-    categoryId?: string;
-
-    @ApiProperty({ required: false })
-    subcategoryId?: string;
-
     @ApiProperty()
     productId: string;
 
