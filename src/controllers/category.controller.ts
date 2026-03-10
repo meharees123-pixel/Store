@@ -7,9 +7,16 @@ import {
   Put,
   Delete,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ParseObjectIdPipe } from '../utils/parse-object-id.pipe';
-import { ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import {
   CreateCategoryDto,
   UpdateCategoryDto,
@@ -63,6 +70,80 @@ export class CategoryController {
   @ApiResponse({ status: 204, description: 'Category deleted' })
   delete(@Param('id', new ParseObjectIdPipe()) id: string) {
     return this.categoryService.delete(id);
+  }
+
+  @Post(':id/image')
+  @ApiOperation({ summary: 'Upload category image' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        image: { type: 'string', format: 'binary' },
+      },
+      required: ['image'],
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('image', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        if (!file.mimetype?.startsWith('image/')) {
+          return cb(new BadRequestException('Only image files are allowed') as any, false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  uploadImage(
+    @Param('id', new ParseObjectIdPipe()) id: string,
+    @UploadedFile() file: any,
+    @Req() request: Request,
+  ) {
+    const userId = request.user?.id;
+    return this.categoryService.uploadCategoryImage({ id, file, userId });
+  }
+
+  @Put(':id/image')
+  @ApiOperation({ summary: 'Replace category image' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        image: { type: 'string', format: 'binary' },
+      },
+      required: ['image'],
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('image', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        if (!file.mimetype?.startsWith('image/')) {
+          return cb(new BadRequestException('Only image files are allowed') as any, false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  replaceImage(
+    @Param('id', new ParseObjectIdPipe()) id: string,
+    @UploadedFile() file: any,
+    @Req() request: Request,
+  ) {
+    const userId = request.user?.id;
+    return this.categoryService.uploadCategoryImage({ id, file, userId });
+  }
+
+  @Delete(':id/image')
+  @ApiOperation({ summary: 'Delete category image' })
+  @ApiResponse({ status: 200, type: CategoryResponseDto })
+  deleteImage(@Param('id', new ParseObjectIdPipe()) id: string, @Req() request: Request) {
+    const userId = request.user?.id;
+    return this.categoryService.deleteCategoryImage({ id, userId });
   }
 
   @Get('dashboard-categories/:storeId')

@@ -2,6 +2,7 @@ import {
     Injectable,
     InternalServerErrorException,
     NotFoundException,
+    BadRequestException,
 } from '@nestjs/common';
 import { Model } from 'mongoose';
 import {
@@ -23,6 +24,7 @@ import {
 import { AppSettings } from '../models/app-settings.model';
 import { Category } from '../models/category.model';
 import { Subcategory } from '../models/subcategory.model';
+import { GcsStorageService } from './gcs-storage.service';
 
 @Injectable()
 export class ProductService {
@@ -38,6 +40,8 @@ export class ProductService {
 
         @InjectModel(Subcategory.name)
         private readonly subcategoryModel: Model<Subcategory & Document>,
+
+        private readonly gcsStorage: GcsStorageService,
     ) { }
 
     async create(
@@ -98,6 +102,47 @@ export class ProductService {
             .findByIdAndDelete(id)
             .exec();
         return { deleted: !!deletedDocument };
+    }
+
+    async uploadProductImage(params: {
+        id: string;
+        file: { buffer: Buffer; mimetype?: string; originalname?: string };
+        userId?: string;
+    }) {
+        const { id, file, userId } = params;
+        if (!file?.buffer) throw new BadRequestException('Missing image file');
+
+        const product = await this.productModel.findById(id).exec();
+        if (!product) throw new NotFoundException('Product not found');
+
+        await this.gcsStorage.deleteByPublicUrl(product.productImage);
+
+        const uploaded = await this.gcsStorage.uploadImage({
+            folder: 'products',
+            entityId: id,
+            buffer: file.buffer,
+            mimeType: file.mimetype,
+            originalName: file.originalname,
+        });
+
+        product.productImage = uploaded.publicUrl;
+        if (userId) product.updatedBy = userId;
+        await product.save();
+
+        return product;
+    }
+
+    async deleteProductImage(params: { id: string; userId?: string }) {
+        const { id, userId } = params;
+        const product = await this.productModel.findById(id).exec();
+        if (!product) throw new NotFoundException('Product not found');
+
+        await this.gcsStorage.deleteByPublicUrl(product.productImage);
+        product.productImage = undefined;
+        if (userId) product.updatedBy = userId;
+        await product.save();
+
+        return product;
     }
 
     async getDashboardProducts(storeId: string): Promise<any[]> {

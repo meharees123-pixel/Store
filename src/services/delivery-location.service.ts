@@ -6,6 +6,7 @@ import {
   UpdateDeliveryLocationDto,
 } from '../dto/delivery-location.dto';
 import { DeliveryLocation } from '../models/delivery-location.model';
+import { User } from '../models/user.model';
 
 @Injectable()
 export class DeliveryLocationService {
@@ -21,15 +22,27 @@ export class DeliveryLocationService {
   }
 
   async findAll(): Promise<DeliveryLocation[]> {
-    return this.locationModel.find().exec();
+    return this.locationModel
+      .find()
+      .populate({ path: 'createdBy', model: User.name, select: 'name email mobileNumber' })
+      .populate({ path: 'updatedBy', model: User.name, select: 'name email mobileNumber' })
+      .exec();
   }
 
   async findByStore(storeId: string): Promise<DeliveryLocation[]> {
-    return this.locationModel.find({ storeId }).exec();
+    return this.locationModel
+      .find({ storeId })
+      .populate({ path: 'createdBy', model: User.name, select: 'name email mobileNumber' })
+      .populate({ path: 'updatedBy', model: User.name, select: 'name email mobileNumber' })
+      .exec();
   }
 
   async findOne(id: string): Promise<DeliveryLocation & Document> {
-    return this.locationModel.findById(id).exec();
+    return this.locationModel
+      .findById(id)
+      .populate({ path: 'createdBy', model: User.name, select: 'name email mobileNumber' })
+      .populate({ path: 'updatedBy', model: User.name, select: 'name email mobileNumber' })
+      .exec();
   }
 
   async update(
