@@ -15,6 +15,12 @@ export class DeliveryLocationDto {
 
     @ApiProperty()
     isActive: boolean;
+
+    @ApiProperty({ required: false, description: 'User ID who created the document' })
+    createdBy?: any;
+
+    @ApiProperty({ required: false, description: 'User ID who last updated the document' })
+    updatedBy?: any;
 }
 
 export class CreateDeliveryLocationDto extends DeliveryLocationDto { }

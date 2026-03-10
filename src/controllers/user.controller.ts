@@ -10,7 +10,7 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Post('firebase-login')
-  @ApiOperation({ summary: 'Login or register user via Firebase token' })
+  @ApiOperation({ summary: 'Login or register user (token will be created if not provided)' })
   @ApiResponse({ status: 200, type: User })
   firebaseLogin(@Body() dto: FirebaseLoginDto) {
     return this.userService.firebaseLogin(dto);

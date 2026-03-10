@@ -11,6 +11,9 @@ import {
     NotFoundException,
     Query,
     Req,
+    UseInterceptors,
+    UploadedFile,
+    BadRequestException,
 } from '@nestjs/common';
 import { ParseObjectIdPipe } from '../utils/parse-object-id.pipe';
 import {
@@ -21,7 +24,10 @@ import {
     ApiBody,
     ApiHeader,
     ApiBearerAuth,
+    ApiConsumes,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import {
     CreateProductDto,
     UpdateProductDto,
@@ -62,8 +68,14 @@ export class ProductController {
     @Get()
     @ApiOperation({ summary: 'Get all products' })
     @ApiResponse({ status: 200, type: [ProductResponseDto] })
-    findAll() {
-        return this.productService.findAll();
+    async findAll() {
+        try {
+            const products = await this.productService.findAll();
+            return products;
+        } catch (error) {
+            console.error('Error fetching products:', error);
+            throw new NotFoundException('Error fetching products');
+        }
     }
 
     /**
@@ -143,5 +155,82 @@ export class ProductController {
             throw new NotFoundException('Product not found');
         }
         return result;
+    }
+
+    @Post(':id/image')
+    @ApiOperation({ summary: 'Upload product image' })
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                image: { type: 'string', format: 'binary' },
+            },
+            required: ['image'],
+        },
+    })
+    @UseInterceptors(
+        FileInterceptor('image', {
+            storage: memoryStorage(),
+            limits: { fileSize: 5 * 1024 * 1024 },
+            fileFilter: (_req, file, cb) => {
+                if (!file.mimetype?.startsWith('image/')) {
+                    return cb(new BadRequestException('Only image files are allowed') as any, false);
+                }
+                cb(null, true);
+            },
+        }),
+    )
+    uploadImage(
+        @Param('id', new ParseObjectIdPipe()) id: string,
+        @UploadedFile() file: any,
+        @Req() request: Request,
+    ) {
+        const userId = request.user?.id;
+        return this.productService.uploadProductImage({ id, file, userId });
+    }
+
+    @Put(':id/image')
+    @ApiOperation({ summary: 'Replace product image' })
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                image: { type: 'string', format: 'binary' },
+            },
+            required: ['image'],
+        },
+    })
+    @UseInterceptors(
+        FileInterceptor('image', {
+            storage: memoryStorage(),
+            limits: { fileSize: 5 * 1024 * 1024 },
+            fileFilter: (_req, file, cb) => {
+                if (!file.mimetype?.startsWith('image/')) {
+                    return cb(new BadRequestException('Only image files are allowed') as any, false);
+                }
+                cb(null, true);
+            },
+        }),
+    )
+    replaceImage(
+        @Param('id', new ParseObjectIdPipe()) id: string,
+        @UploadedFile() file: any,
+        @Req() request: Request,
+    ) {
+        const userId = request.user?.id;
+        return this.productService.uploadProductImage({ id, file, userId });
+    }
+
+    @Delete(':id/image')
+    @ApiOperation({ summary: 'Delete product image' })
+    @ApiResponse({ status: 200, type: ProductResponseDto })
+    deleteImage(
+        @Param('id', new ParseObjectIdPipe()) id: string,
+        @Req() request: Request,
+    ) {
+        const userId = request.user?.id;
+        return this.productService.deleteProductImage({ id, userId });
     }
 }

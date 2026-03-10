@@ -6,8 +6,10 @@ import {
   Param,
   Put,
   Delete,
+  Req,
   UseGuards,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { ParseObjectIdPipe } from '../utils/parse-object-id.pipe';
 import { ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
 import {
@@ -27,8 +29,12 @@ export class DeliveryLocationController {
   @Post()
   @ApiOperation({ summary: 'Create a new delivery location' })
   @ApiResponse({ status: 201, type: DeliveryLocationResponseDto })
-  create(@Body() createDto: CreateDeliveryLocationDto) {
-    return this.locationService.create(createDto);
+  create(@Body() createDto: CreateDeliveryLocationDto, @Req() request: Request) {
+    const userId = request.user?.id;
+    return this.locationService.create({
+      ...createDto,
+      ...(userId ? { createdBy: userId, updatedBy: userId } : {}),
+    } as any);
   }
 
   @Get()
@@ -59,8 +65,13 @@ export class DeliveryLocationController {
   update(
     @Param('id', new ParseObjectIdPipe()) id: string,
     @Body() updateDto: UpdateDeliveryLocationDto,
+    @Req() request: Request,
   ) {
-    return this.locationService.update(id, updateDto);
+    const userId = request.user?.id;
+    return this.locationService.update(id, {
+      ...updateDto,
+      ...(userId ? { updatedBy: userId } : {}),
+    } as any);
   }
 
   @Delete(':id')

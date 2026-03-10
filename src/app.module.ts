@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from './auth/auth.module';
 
 import { UserController } from './controllers/user.controller';
+import { UsersController } from './controllers/users.controller';
 import { UserService } from './services/user.service';
 import { UserSchema } from './models/user.model';
 
@@ -43,6 +44,7 @@ import { AppSettingsController } from './controllers/app-settings.controller';
 import { AppSettingsService } from './services/app-settings.service';
 
 import { AuthGuard } from './guards/auth.guard';
+import { GcsStorageService } from './services/gcs-storage.service';
 //iQlUh3tTQkqfJ4A1
 @Module({
   imports: [
@@ -65,6 +67,7 @@ import { AuthGuard } from './guards/auth.guard';
   ],
   controllers: [
     UserController,
+    UsersController,
     StoreController,
     CategoryController,
     SubcategoryController,
@@ -86,7 +89,8 @@ import { AuthGuard } from './guards/auth.guard';
     CartService,
     OrderService,
     AppSettingsService,
-    AuthGuard
+    AuthGuard,
+    GcsStorageService
   ],
 })
 export class AppModule { }
