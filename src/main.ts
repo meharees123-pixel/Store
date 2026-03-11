@@ -46,11 +46,15 @@ async function bootstrap() {
 
   SwaggerModule.setup('api-docs', app, document);
 
- app.enableCors({
-  origin: ['http://34.57.213.115', 'http://34.56.150.67','http://localhost:4200'], // allow both frontend and proxy IPs
-  methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-  allowedHeaders: 'Content-Type, Authorization',
-  credentials: true,
+//  app.enableCors({
+//   origin: ['http://34.57.213.115', 'http://34.56.150.67','http://localhost:4200'], // allow both frontend and proxy IPs
+//   methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+//   allowedHeaders: 'Content-Type, Authorization',
+//   credentials: true,
+// });
+
+app.enableCors({
+  origin: '*',
 });
 
 
