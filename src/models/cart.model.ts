@@ -3,7 +3,9 @@ import { Document, SchemaTypes } from 'mongoose';
 import { ApiProperty } from '@nestjs/swagger';
 import { AuditModel, AuditSchema } from './audit.model';
 import { User } from './user.model';
+import { Store } from './store.model';
 import { DeliveryLocation } from './delivery-location.model';
+import { UserAddress } from './user-address.model';
 import { Category } from './category.model';
 import { Subcategory } from './subcategory.model';
 import { Product } from './product.model';
@@ -14,9 +16,25 @@ export class Cart extends AuditModel {
   @Prop({ type: SchemaTypes.ObjectId, ref: User.name, required: true })
   userId: string;
 
+  @ApiProperty({ description: 'Store ID this cart belongs to' })
+  @Prop({ type: SchemaTypes.ObjectId, ref: Store.name, required: true })
+  storeId: string;
+
   @ApiProperty({ description: 'User address ID for delivery' })
+  @Prop({ type: SchemaTypes.ObjectId, ref: UserAddress.name })
+  userAddressId?: string;
+
+  @ApiProperty({ description: 'Delivery location selected for this cart/store' })
   @Prop({ type: SchemaTypes.ObjectId, ref: DeliveryLocation.name })
-  addressId: string;
+  deliveryLocationId?: string;
+
+  // Deprecated legacy field (was used inconsistently across clients).
+  @Prop({ type: SchemaTypes.ObjectId, ref: DeliveryLocation.name })
+  addressId?: string;
+
+  @ApiProperty({ description: 'Category ID of the product' })
+  @Prop({ type: SchemaTypes.ObjectId, ref: Category.name })
+  categoryId: string;
 
   @ApiProperty({ description: 'Subcategory ID of the product' })
   @Prop({ type: SchemaTypes.ObjectId, ref: Subcategory.name })

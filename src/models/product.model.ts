@@ -4,6 +4,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { AuditModel, AuditSchema } from './audit.model';
 import { Category } from './category.model';
 import { Subcategory } from './subcategory.model';
+import { Store } from './store.model';
 
 @Schema()
 export class Product extends AuditModel {
@@ -27,6 +28,10 @@ export class Product extends AuditModel {
   @Prop({ required: true, default: 0 })
   quantity: number;
 
+  @ApiProperty({ description: 'Store ID this product belongs to', example: '64f1c2d9e4b1a2a3c1d2e3f4' })
+  @Prop({ type: SchemaTypes.ObjectId, ref: Store.name })
+  storeId?: string;
+
 
   @ApiProperty({ description: 'Reference to parent category', example: '68c467b88f1124a8b0fcd2b3' })
   @Prop({ required: true, type: SchemaTypes.ObjectId, ref: Category.name })
@@ -39,4 +44,7 @@ export class Product extends AuditModel {
 
 export const ProductSchema = SchemaFactory.createForClass(Product);
 ProductSchema.add(AuditSchema); // Add audit fields
+
+// Enable fast global search on common text fields.
+ProductSchema.index({ name: 'text', description: 'text' });
 export type ProductDocument = Product & Document;

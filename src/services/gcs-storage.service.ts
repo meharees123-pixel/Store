@@ -72,7 +72,7 @@ export class GcsStorageService {
   }
 
   async uploadImage(params: {
-    folder: 'products' | 'categories';
+    folder: 'products' | 'categories' | 'subcategories';
     entityId: string;
     buffer: Buffer;
     mimeType?: string;

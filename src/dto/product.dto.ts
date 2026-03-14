@@ -16,6 +16,9 @@ export class ProductDto {
   @ApiProperty({ description: 'Available quantity in stock', example: 100 })
   quantity: number;
 
+  @ApiProperty({ description: 'Store ID (derived from category)' })
+  storeId?: string;
+
   @ApiProperty({ description: 'Parent category ID', example: '68c467b88f1124a8b0fcd2b3' })
   categoryId: string;
 

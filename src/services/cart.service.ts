@@ -30,9 +30,17 @@ export class CartService {
             throw new BadRequestException(`Only ${product.quantity} units available`);
         }
 
+        const storeId = (product as any).storeId || dto.storeId;
+        if (!storeId) {
+            throw new BadRequestException('storeId is required');
+        }
+
         const cartItem = new this.cartModel({
             userId: dto.userId,
-            userAddressId: dto.addressId,
+            storeId,
+            userAddressId: dto.userAddressId ?? dto.addressId,
+            deliveryLocationId: dto.deliveryLocationId,
+            addressId: dto.addressId, // legacy
             productId: dto.productId,
             quantity: dto.quantity,
             unitPrice: product.price,
@@ -71,11 +79,19 @@ export class CartService {
             throw new BadRequestException(`Only ${product.quantity} units available`);
         }
 
+        const storeId = (product as any).storeId || dto.storeId;
+        if (!storeId) {
+            throw new BadRequestException('storeId is required');
+        }
+
         const updatedCart = await this.cartModel.findByIdAndUpdate(
             id,
             {
                 userId: dto.userId,
-                userAddressId: dto.addressId,
+                storeId,
+                userAddressId: dto.userAddressId ?? dto.addressId,
+                deliveryLocationId: dto.deliveryLocationId,
+                addressId: dto.addressId, // legacy
                 productId: dto.productId,
                 quantity: dto.quantity,
                 unitPrice: product.price,
@@ -93,8 +109,49 @@ export class CartService {
         return updatedCart;
     }
 
+    async findByStore(storeId: string): Promise<Cart[]> {
+        return this.cartModel.find({ storeId }).exec();
+    }
+
     async delete(id: string): Promise<{ deleted: boolean }> {
         const deleted = await this.cartModel.findByIdAndDelete(id).exec();
         return { deleted: !!deleted };
+    }
+
+    async updateAddressForUserStore(params: {
+        userId: string;
+        storeId: string;
+        userAddressId?: string;
+        deliveryLocationId?: string;
+        addressId?: string;
+    }): Promise<{ matched: number; modified: number }> {
+        const userAddressId = params.userAddressId ?? params.addressId;
+        const update: any = {};
+        if (userAddressId) update.userAddressId = userAddressId;
+        if (params.deliveryLocationId) update.deliveryLocationId = params.deliveryLocationId;
+        if (params.addressId) update.addressId = params.addressId; // legacy, keep if client still sends it
+
+        if (!Object.keys(update).length) {
+            throw new BadRequestException('userAddressId or deliveryLocationId is required');
+        }
+
+        const result: any = await this.cartModel
+            .updateMany(
+                { userId: params.userId, storeId: params.storeId },
+                { $set: update },
+            )
+            .exec();
+
+        const matched = Number(result?.matchedCount ?? result?.n ?? 0);
+        const modified = Number(result?.modifiedCount ?? result?.nModified ?? 0);
+        return { matched, modified };
+    }
+
+    async countByUserStore(params: { userId: string; storeId: string }): Promise<{ count: number }> {
+        const count = await this.cartModel.countDocuments({
+            userId: params.userId,
+            storeId: params.storeId,
+        });
+        return { count };
     }
 }

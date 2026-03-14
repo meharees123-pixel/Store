@@ -24,6 +24,7 @@ import {
     ApiBody,
     ApiHeader,
     ApiBearerAuth,
+    ApiQuery,
     ApiConsumes,
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -79,29 +80,72 @@ export class ProductController {
     }
 
     /**
-     * Get products by category ID
+     * Get products by store ID
      */
-    @Get(':categoryId')
-    @ApiOperation({ summary: 'Get products by category ID' })
+    @Get('store/:storeId')
+    @ApiOperation({ summary: 'Get products by store ID' })
+    @ApiParam({ name: 'storeId', example: '652f1c2d9e4b1a2a3c1d2e3f4' })
+    @ApiResponse({ status: 200, type: [ProductResponseDto] })
+    findByStore(@Param('storeId', new ParseObjectIdPipe()) storeId: string) {
+        return this.productService.findByStoreId(storeId);
+    }
+
+    /**
+     * Global product search (name/description/etc.)
+     */
+    @Get('search')
+    @ApiOperation({ summary: 'Search products by query' })
+    @ApiQuery({ name: 'q', required: true, example: 'apple' })
+    @ApiQuery({ name: 'storeId', required: false, example: '652f1c2d9e4b1a2a3c1d2e3f4' })
+    @ApiQuery({ name: 'limit', required: false, example: 25 })
+    @ApiQuery({ name: 'skip', required: false, example: 0 })
+    @ApiResponse({ status: 200, type: [ProductResponseDto] })
+    search(
+        @Query('q') q: string,
+        @Query('storeId') storeId?: string,
+        @Query('limit') limit?: string,
+        @Query('skip') skip?: string,
+    ) {
+        const limitNum = limit !== undefined ? parseInt(String(limit), 10) : undefined;
+        const skipNum = skip !== undefined ? parseInt(String(skip), 10) : undefined;
+
+        return this.productService.search({
+            q,
+            storeId,
+            limit: Number.isFinite(limitNum as any) ? (limitNum as number) : undefined,
+            skip: Number.isFinite(skipNum as any) ? (skipNum as number) : undefined,
+        });
+    }
+
+    /**
+     * Get products by category OR subcategory ID
+     */
+    @Get('by-parent/:id')
+    @ApiOperation({ summary: 'Get products by category OR subcategory ID' })
     @ApiParam({
-        name: 'categoryId',
-        description: 'Parent category ID',
-        example: '68c467b88f1124a8b0fcd2b3', // 🔁 MongoDB ObjectId format
+        name: 'id',
+        description: 'Category ID or Subcategory ID',
+        example: '68c467b88f1124a8b0fcd2b3', // ðŸ” MongoDB ObjectId format
     })
     @ApiResponse({ status: 200, type: [ProductResponseDto] })
-    findByCategoryId(@Param('categoryId') categoryId: string) {
-        return this.productService.findByCategoryId(categoryId);
+    async findByParentId(@Param('id', new ParseObjectIdPipe()) id: string) {
+        const products = await this.productService.findByParentId(id);
+        if (!products.length) {
+            throw new NotFoundException('No products found for the provided category/subcategory id');
+        }
+        return products;
     }
 
     /**
      * Get a product by ID
      */
-
     @Get(':id')
     @ApiOperation({ summary: 'Get product by ID' })
     @ApiResponse({ status: 200, type: ProductResponseDto })
-    findOne(@Param('id') id: string) {
-        return this.productService.findOne(id);
+    async findOne(@Param('id', new ParseObjectIdPipe()) id: string) {
+        const product = await this.productService.findOne(id);
+        if (!product) throw new NotFoundException('Product not found');
+        return product;
     }
 
     /**
@@ -113,7 +157,7 @@ export class ProductController {
     @ApiParam({
         name: 'id',
         description: 'Product ID',
-        example: '68c467b88f1124a8b0fcd2b3', // 🔁 MongoDB ObjectId format
+        example: '68c467b88f1124a8b0fcd2b3', // ðŸ” MongoDB ObjectId format
     })
     @ApiBody({ type: UpdateProductDto })
     @ApiResponse({ status: 200, type: ProductResponseDto })
@@ -143,7 +187,7 @@ export class ProductController {
     @ApiParam({
         name: 'id',
         description: 'Product ID',
-        example: '68c467b88f1124a8b0fcd2b3', // 🔁 MongoDB ObjectId format
+        example: '68c467b88f1124a8b0fcd2b3', // ðŸ” MongoDB ObjectId format
     })
     @ApiResponse({ status: 204, description: 'Product deleted' })
     @ApiResponse({ status: 404, description: 'Product not found' })

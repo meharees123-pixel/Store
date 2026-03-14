@@ -18,13 +18,6 @@ export class UserAddress extends AuditModel {
     @Prop()
     state?: string;
 
-    @ApiProperty({
-        description: 'Delivery Location ID associated with this address',
-        example: '64f1c2d9e4b1a2a3c1d2e3f4',
-    })
-    @Prop({ required: true })
-    deliveryLocationId: string;
-
     @ApiProperty({ description: 'Country', example: 'Qatar' })
     @Prop({ required: true })
     country: string;
@@ -37,4 +30,18 @@ export class UserAddress extends AuditModel {
 export type UserAddressDocument = UserAddress & Document;
 export const UserAddressSchema = SchemaFactory.createForClass(UserAddress);
 UserAddressSchema.add(AuditSchema);
+
+// Hide legacy fields from old documents (if present in MongoDB).
+UserAddressSchema.set('toJSON', {
+    transform: (_doc, ret) => {
+        delete (ret as any).deliveryLocationId;
+        return ret;
+    },
+});
+UserAddressSchema.set('toObject', {
+    transform: (_doc, ret) => {
+        delete (ret as any).deliveryLocationId;
+        return ret;
+    },
+});
 

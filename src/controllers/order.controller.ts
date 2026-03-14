@@ -5,6 +5,7 @@ import {
   Get,
   Param,
   Put,
+  Delete,
   UseGuards,
 } from '@nestjs/common';
 import { ParseObjectIdPipe } from '../utils/parse-object-id.pipe';
@@ -45,6 +46,14 @@ export class OrderController {
     return this.orderService.findByUser(userId);
   }
 
+  @Get('store/:storeId')
+  @ApiOperation({ summary: 'Get orders by store ID' })
+  @ApiParam({ name: 'storeId', example: '64f1c2d9e4b1a2a3c1d2e3f4' })
+  @ApiResponse({ status: 200, type: [OrderResponseDto] })
+  findByStore(@Param('storeId', new ParseObjectIdPipe()) storeId: string) {
+    return this.orderService.findByStore(storeId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get order by ID' })
   @ApiResponse({ status: 200, type: OrderResponseDto })
@@ -60,5 +69,12 @@ export class OrderController {
     @Body() dto: UpdateOrderDto,
   ) {
     return this.orderService.update(id, dto);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete order by ID' })
+  @ApiResponse({ status: 204, description: 'Order deleted' })
+  delete(@Param('id', new ParseObjectIdPipe()) id: string) {
+    return this.orderService.delete(id);
   }
 }

@@ -3,6 +3,7 @@ import {
   Injectable,
   InternalServerErrorException,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { InjectModel } from '@nestjs/mongoose';
@@ -11,6 +12,7 @@ import { User, UserDocument } from '../models/user.model';
 import {
   CreateUserDto,
   FirebaseLoginDto,
+  FirebaseLoginInfoDto,
   FirebaseLogoutDto,
   UpdateUserDto,
 } from '../dto/user.dto';
@@ -92,22 +94,29 @@ export class UserService {
   }
 
   async firebaseLogin(dto: FirebaseLoginDto): Promise<UserDocument> {
-    const existing = await this.userModel.findOne({ mobileNumber: dto.mobileNumber }).exec();
-    const token = dto.firebaseToken?.trim() || randomUUID();
+    const mobileNumber = dto.mobileNumber?.trim();
+    if (!mobileNumber) throw new BadRequestException('mobileNumber is required');
 
-    if (existing) {
-      existing.firebaseToken = token;
-      existing.isActive = true;
-      if (dto.name) existing.name = dto.name;
-      return existing.save();
-    }
+    const user = await this.userModel.findOne({ mobileNumber }).exec();
+    if (!user) throw new UnauthorizedException('Phone number is not registered');
 
-    return this.userModel.create({
-      mobileNumber: dto.mobileNumber,
-      firebaseToken: token,
-      name: dto.name,
-      isActive: true,
-    });
+    // Ensure the account is active and has a token to use as Bearer auth for subsequent requests.
+    if (!user.firebaseToken) user.firebaseToken = randomUUID();
+    user.isActive = true;
+    if (dto.name) user.name = dto.name;
+
+    return user.save();
+  }
+
+  async firebaseLoginInfo(dto: FirebaseLoginInfoDto): Promise<UserDocument> {
+    const mobileNumber = dto.mobileNumber?.trim();
+    if (!mobileNumber) throw new BadRequestException('mobileNumber is required');
+
+    const user = await this.userModel.findOne({ mobileNumber }).exec();
+    if (!user) throw new UnauthorizedException('Phone number is not registered');
+
+    // Read-only: do not generate/rotate tokens or toggle isActive.
+    return user;
   }
 
   async firebaseLogout(dto: FirebaseLogoutDto): Promise<{ success: boolean }> {

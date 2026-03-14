@@ -4,6 +4,9 @@ export class CreateAppSettingsDto {
   @ApiProperty()
   key: string;
 
+  @ApiProperty({ required: false, description: 'Optional store scope (omit for global setting)' })
+  storeId?: string;
+
   @ApiProperty()
   value: string;
 
@@ -12,6 +15,9 @@ export class CreateAppSettingsDto {
 }
 
 export class UpdateAppSettingsDto {
+  @ApiProperty({ required: false, description: 'Optional store scope (omit for global setting)' })
+  storeId?: string;
+
   @ApiProperty({ required: false })
   value?: string;
 
@@ -25,6 +31,9 @@ export class AppSettingsResponseDto {
 
   @ApiProperty()
   key: string;
+
+  @ApiProperty({ required: false })
+  storeId?: string;
 
   @ApiProperty()
   value: string;

@@ -1,7 +1,7 @@
 import { Controller, Post, Body } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { UserService } from '../services/user.service';
-import { FirebaseLoginDto, FirebaseLogoutDto } from '../dto/user.dto';
+import { FirebaseLoginDto, FirebaseLoginInfoDto, FirebaseLogoutDto } from '../dto/user.dto';
 import { User } from '../models/user.model';
 
 @ApiTags('auth')
@@ -10,10 +10,17 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Post('firebase-login')
-  @ApiOperation({ summary: 'Login or register user (token will be created if not provided)' })
+  @ApiOperation({ summary: 'Login existing user by phone (returns stored token)' })
   @ApiResponse({ status: 200, type: User })
   firebaseLogin(@Body() dto: FirebaseLoginDto) {
     return this.userService.firebaseLogin(dto);
+  }
+
+  @Post('firebase-login-info')
+  @ApiOperation({ summary: 'Fetch existing user/token (no DB updates)' })
+  @ApiResponse({ status: 200, type: User })
+  firebaseLoginInfo(@Body() dto: FirebaseLoginInfoDto) {
+    return this.userService.firebaseLoginInfo(dto);
   }
 
   @Post('firebase-logout')
