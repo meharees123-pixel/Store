@@ -46,6 +46,47 @@ export class CartController {
     return this.cartService.findByUser(userId);
   }
 
+  @Get('store/:storeId')
+  @ApiOperation({ summary: 'Get cart items by store ID' })
+  @ApiParam({ name: 'storeId', example: '64f1c2d9e4b1a2a3c1d2e3f4' })
+  @ApiResponse({ status: 200, type: [CartResponseDto] })
+  findByStore(@Param('storeId', new ParseObjectIdPipe()) storeId: string) {
+    return this.cartService.findByStore(storeId);
+  }
+
+  @Put('user/:userId/store/:storeId/address')
+  @ApiOperation({ summary: 'Update addressId for all cart items by userId + storeId' })
+  @ApiParam({ name: 'userId', example: '64f1c2d9e4b1a2a3c1d2e3f4' })
+  @ApiParam({ name: 'storeId', example: '64f1c2d9e4b1a2a3c1d2e3f4' })
+  @ApiResponse({ status: 200, type: Object })
+  updateAddressForUserStore(
+    @Param('userId', new ParseObjectIdPipe()) userId: string,
+    @Param('storeId', new ParseObjectIdPipe()) storeId: string,
+    @Body('userAddressId') userAddressId?: string,
+    @Body('deliveryLocationId') deliveryLocationId?: string,
+    @Body('addressId') addressId?: string,
+  ) {
+    return this.cartService.updateAddressForUserStore({
+      userId,
+      storeId,
+      userAddressId,
+      deliveryLocationId,
+      addressId,
+    });
+  }
+
+  @Get('count/user/:userId/store/:storeId')
+  @ApiOperation({ summary: 'Get cart items count by userId + storeId' })
+  @ApiParam({ name: 'userId', example: '64f1c2d9e4b1a2a3c1d2e3f4' })
+  @ApiParam({ name: 'storeId', example: '64f1c2d9e4b1a2a3c1d2e3f4' })
+  @ApiResponse({ status: 200, type: Object })
+  countByUserStore(
+    @Param('userId', new ParseObjectIdPipe()) userId: string,
+    @Param('storeId', new ParseObjectIdPipe()) storeId: string,
+  ) {
+    return this.cartService.countByUserStore({ userId, storeId });
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get cart item by ID' })
   @ApiResponse({ status: 200, type: CartResponseDto })

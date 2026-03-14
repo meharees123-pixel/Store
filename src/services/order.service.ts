@@ -9,6 +9,7 @@ import { CreateOrderDto, UpdateOrderDto } from '../dto/order.dto';
 import { Order } from '../models/order.model';
 import { Cart } from '../models/cart.model';
 import { Product } from '../models/product.model';
+import { OrderStatus } from '../constants/order-status';
 
 @Injectable()
 export class OrderService {
@@ -22,11 +23,13 @@ export class OrderService {
   ) {}
 
   async create(dto: CreateOrderDto): Promise<Order & Document> {
-    const cartItems = await this.cartModel.find({
-      userId: dto.userId,
-      storeId: dto.storeId,
-      userAddressId: dto.userAddressId,
-    }).exec();
+    const cartQuery: any = { userId: dto.userId, storeId: dto.storeId };
+
+    // Prefer the new fields; fall back to legacy `addressId` behavior.
+    cartQuery.$or = [{ userAddressId: dto.userAddressId }, { addressId: dto.userAddressId }];
+    if (dto.deliveryLocationId) cartQuery.deliveryLocationId = dto.deliveryLocationId;
+
+    const cartItems = await this.cartModel.find(cartQuery).exec();
 
     if (!cartItems.length) {
       throw new NotFoundException('No cart items found for this user and store');
@@ -55,17 +58,16 @@ export class OrderService {
     const order = await this.orderModel.create({
       userId: dto.userId,
       userAddressId: dto.userAddressId,
+      deliveryLocationId: dto.deliveryLocationId,
       storeId: dto.storeId,
       totalAmount,
       items: cartItems,
-      status: 'Pending',
+      status: OrderStatus.PENDING,
     });
 
-    await this.cartModel.deleteMany({
-      userId: dto.userId,
-      storeId: dto.storeId,
-      userAddressId: dto.userAddressId,
-    });
+    const deleteQuery: any = { userId: dto.userId, storeId: dto.storeId, $or: cartQuery.$or };
+    if (dto.deliveryLocationId) deleteQuery.deliveryLocationId = dto.deliveryLocationId;
+    await this.cartModel.deleteMany(deleteQuery);
 
     return order;
   }
@@ -78,63 +80,115 @@ export class OrderService {
     return this.orderModel.find({ userId }).exec();
   }
 
+  async findByStore(storeId: string): Promise<Order[]> {
+    return this.orderModel.find({ storeId }).exec();
+  }
+
   async findOne(id: string): Promise<Order & Document> {
     const order = await this.orderModel.findById(id).exec();
     if (!order) throw new NotFoundException('Order not found');
     return order;
   }
 
-async update(id: string, dto: UpdateOrderDto): Promise<Order & Document> {
-  const order = await this.orderModel.findById(id).exec();
-  if (!order) throw new NotFoundException('Order not found');
+  async update(id: string, dto: UpdateOrderDto): Promise<Order & Document> {
+    const order = await this.orderModel.findById(id).exec();
+    if (!order) throw new NotFoundException('Order not found');
 
-  // Handle item updates
-  if (dto.items && dto.items.length > 0) {
-    const updatedItems = [];
-
-    for (const update of dto.items) {
-      const existing = order.items.find(i => i.productId.toString() === update.productId);
-      if (!existing) continue;
-
-      const product = await this.productModel.findById(update.productId).exec();
-      if (!product) throw new NotFoundException(`Product not found: ${update.productId}`);
-
-      // Handle deletion
-      if (update.remove) {
-        product.quantity += existing.quantity;
-        await product.save();
-        continue; // skip adding to updatedItems
+    // Handle item updates (add/remove/change quantity)
+    if (dto.items && dto.items.length > 0) {
+      const items = Array.isArray(order.items) ? [...order.items] : [];
+      const indexByProductId = new Map<string, number>();
+      for (let i = 0; i < items.length; i++) {
+        const pid = items[i]?.productId;
+        if (pid !== undefined && pid !== null) {
+          indexByProductId.set(String(pid), i);
+        }
       }
 
-      // Handle quantity update
-      if (typeof update.quantity === 'number') {
-        const diff = update.quantity - existing.quantity;
+      for (const change of dto.items) {
+        const productId = String(change.productId || '').trim();
+        if (!productId) continue;
 
-        if (diff > 0 && product.quantity < diff) {
-          throw new BadRequestException(`Insufficient stock for ${product.name}`);
+        const itemIndex = indexByProductId.get(productId);
+
+        const product = await this.productModel.findById(productId).exec();
+        if (!product) throw new NotFoundException(`Product not found: ${productId}`);
+
+        if (change.remove) {
+          if (itemIndex === undefined) continue;
+          const existing = items[itemIndex];
+          product.quantity += Number(existing.quantity || 0);
+          await product.save();
+          items.splice(itemIndex, 1);
+          indexByProductId.delete(productId);
+          // Rebuild indices after splice (small arrays expected)
+          indexByProductId.clear();
+          for (let i = 0; i < items.length; i++) {
+            const pid = items[i]?.productId;
+            if (pid !== undefined && pid !== null) indexByProductId.set(String(pid), i);
+          }
+          continue;
         }
 
-        product.quantity -= diff;
-        await product.save();
+        if (typeof change.quantity === 'number') {
+          const nextQty = change.quantity;
+          if (!Number.isFinite(nextQty) || nextQty < 1) {
+            throw new BadRequestException('Invalid quantity');
+          }
 
-        existing.quantity = update.quantity;
-        existing.totalPrice = update.quantity * existing.unitPrice;
+          if (itemIndex === undefined) {
+            // Add new item
+            if (product.quantity < nextQty) {
+              throw new BadRequestException(`Insufficient stock for ${product.name}`);
+            }
+
+            product.quantity -= nextQty;
+            await product.save();
+
+            items.push({
+              userId: (order as any).userId,
+              storeId: (order as any).storeId,
+              userAddressId: (order as any).userAddressId,
+              deliveryLocationId: (order as any).deliveryLocationId,
+              productId,
+              quantity: nextQty,
+              unitPrice: Number((product as any).price || 0),
+              totalPrice: nextQty * Number((product as any).price || 0),
+              categoryId: (product as any).categoryId,
+              subcategoryId: (product as any).subcategoryId,
+            });
+            indexByProductId.set(productId, items.length - 1);
+            continue;
+          }
+
+          const existing = items[itemIndex];
+          const currentQty = Number(existing.quantity || 0);
+          const diff = nextQty - currentQty;
+
+          if (diff > 0 && product.quantity < diff) {
+            throw new BadRequestException(`Insufficient stock for ${product.name}`);
+          }
+
+          // diff > 0 reduces stock; diff < 0 restores stock (since subtracting negative adds)
+          product.quantity -= diff;
+          await product.save();
+
+          existing.quantity = nextQty;
+          existing.totalPrice = nextQty * Number(existing.unitPrice || 0);
+        }
       }
 
-      updatedItems.push(existing);
+      order.items = items;
+      order.totalAmount = items.reduce((sum, i) => sum + Number(i?.totalPrice || 0), 0);
     }
 
-    order.items = updatedItems;
-    order.totalAmount = updatedItems.reduce((sum, i) => sum + i.totalPrice, 0);
+    if (dto.status) order.status = dto.status;
+    if (dto.userAddressId) order.userAddressId = dto.userAddressId;
+    if (dto.deliveryLocationId !== undefined) order.deliveryLocationId = dto.deliveryLocationId || undefined;
+
+    await order.save();
+    return order;
   }
-
-  // Update status or address
-  if (dto.status) order.status = dto.status;
-  if (dto.userAddressId) order.userAddressId = dto.userAddressId;
-
-  await order.save();
-  return order;
-}
 
   async delete(id: string): Promise<{ deleted: boolean }> {
     const deleted = await this.orderModel.findByIdAndDelete(id).exec();

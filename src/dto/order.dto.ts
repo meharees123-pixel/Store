@@ -8,6 +8,9 @@ export class CreateOrderDto {
   @ApiProperty()
   userAddressId: string;
 
+  @ApiProperty({ required: false })
+  deliveryLocationId?: string;
+
   @ApiProperty()
   storeId: string;
 }
@@ -30,6 +33,9 @@ export class UpdateOrderDto {
   @ApiProperty({ required: false })
   userAddressId?: string;
 
+  @ApiProperty({ required: false })
+  deliveryLocationId?: string;
+
   @ApiProperty({ required: false, type: [OrderItemUpdateDto] })
   items?: OrderItemUpdateDto[];
 }
@@ -43,6 +49,9 @@ export class OrderResponseDto {
 
   @ApiProperty()
   userAddressId: string;
+
+  @ApiProperty({ required: false })
+  deliveryLocationId?: string;
 
   @ApiProperty()
   storeId: string;

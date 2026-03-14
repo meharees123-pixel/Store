@@ -6,6 +6,7 @@ import { User } from './user.model';
 import { UserAddress } from './user-address.model';
 import { Store } from './store.model';
 import { OrderStatus } from '../constants/order-status';
+import { DeliveryLocation } from './delivery-location.model';
 @Schema()
 export class Order extends AuditModel {
   @ApiProperty()
@@ -15,6 +16,10 @@ export class Order extends AuditModel {
   @ApiProperty()
   @Prop({ type: SchemaTypes.ObjectId, ref: UserAddress.name, required: true })
   userAddressId: string;
+
+  @ApiProperty({ required: false })
+  @Prop({ type: SchemaTypes.ObjectId, ref: DeliveryLocation.name })
+  deliveryLocationId?: string;
 
   @ApiProperty()
   @Prop({ type: SchemaTypes.ObjectId, ref: Store.name, required: true })

@@ -10,6 +10,9 @@ export class SubcategoryDto {
   @ApiProperty({ description: 'Description of the subcategory' })
   description?: string;
 
+  @ApiProperty({ description: 'Store ID (derived from category)' })
+  storeId?: string;
+
   @ApiProperty({ description: 'Reference to parent category' })
   categoryId: string;
 

@@ -8,6 +8,9 @@ import {
     Put,
     Delete,
     Req,
+    UseInterceptors,
+    UploadedFile,
+    BadRequestException,
 } from '@nestjs/common';
 import { ParseObjectIdPipe } from '../utils/parse-object-id.pipe';
 import {
@@ -17,6 +20,7 @@ import {
     ApiParam,
     ApiBody,
     ApiHeader,
+    ApiConsumes,
 } from '@nestjs/swagger';
 import {
     CreateSubcategoryDto,
@@ -26,6 +30,8 @@ import {
 import { SubcategoryService } from '../services/subcategory.service';
 import { AuthGuard } from '../guards/auth.guard';
 import { UseGuards } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 
 @ApiTags('subcategories')
 @UseGuards(AuthGuard)
@@ -83,6 +89,87 @@ export class SubcategoryController {
     @ApiResponse({ status: 200, type: [SubcategoryResponseDto] })
     findByCategoryId(@Param('categoryId', ParseObjectIdPipe) categoryId: string) {
     return this.subcategoryService.findByCategoryId(categoryId);
+    }
+
+    @Get('/store/:storeId')
+    @ApiOperation({ summary: 'Get all subcategories by store ID' })
+    @ApiResponse({ status: 200, type: [SubcategoryResponseDto] })
+    findByStoreId(@Param('storeId', ParseObjectIdPipe) storeId: string) {
+      return this.subcategoryService.findByStoreId(storeId);
+    }
+
+    @Post(':id/image')
+    @ApiOperation({ summary: 'Upload subcategory image' })
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({
+      schema: {
+        type: 'object',
+        properties: {
+          image: { type: 'string', format: 'binary' },
+        },
+        required: ['image'],
+      },
+    })
+    @UseInterceptors(
+      FileInterceptor('image', {
+        storage: memoryStorage(),
+        limits: { fileSize: 5 * 1024 * 1024 },
+        fileFilter: (_req, file, cb) => {
+          if (!file.mimetype?.startsWith('image/')) {
+            return cb(new BadRequestException('Only image files are allowed') as any, false);
+          }
+          cb(null, true);
+        },
+      }),
+    )
+    uploadImage(
+      @Param('id', new ParseObjectIdPipe()) id: string,
+      @UploadedFile() file: any,
+      @Req() request: Request,
+    ) {
+      const userId = request.user?.id;
+      return this.subcategoryService.uploadSubcategoryImage({ id, file, userId });
+    }
+
+    @Put(':id/image')
+    @ApiOperation({ summary: 'Replace subcategory image' })
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({
+      schema: {
+        type: 'object',
+        properties: {
+          image: { type: 'string', format: 'binary' },
+        },
+        required: ['image'],
+      },
+    })
+    @UseInterceptors(
+      FileInterceptor('image', {
+        storage: memoryStorage(),
+        limits: { fileSize: 5 * 1024 * 1024 },
+        fileFilter: (_req, file, cb) => {
+          if (!file.mimetype?.startsWith('image/')) {
+            return cb(new BadRequestException('Only image files are allowed') as any, false);
+          }
+          cb(null, true);
+        },
+      }),
+    )
+    replaceImage(
+      @Param('id', new ParseObjectIdPipe()) id: string,
+      @UploadedFile() file: any,
+      @Req() request: Request,
+    ) {
+      const userId = request.user?.id;
+      return this.subcategoryService.uploadSubcategoryImage({ id, file, userId });
+    }
+
+    @Delete(':id/image')
+    @ApiOperation({ summary: 'Delete subcategory image' })
+    @ApiResponse({ status: 200, type: SubcategoryResponseDto })
+    deleteImage(@Param('id', new ParseObjectIdPipe()) id: string, @Req() request: Request) {
+      const userId = request.user?.id;
+      return this.subcategoryService.deleteSubcategoryImage({ id, userId });
     }
 
 }

@@ -11,10 +11,11 @@ import {
   UploadedFile,
   BadRequestException,
   Req,
+  Query,
 } from '@nestjs/common';
 import { Request } from 'express';
 import { ParseObjectIdPipe } from '../utils/parse-object-id.pipe';
-import { ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
+import { ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import {
@@ -24,7 +25,7 @@ import {
 } from '../dto/category.dto';
 import { CategoryService } from '../services/category.service';
 import { ProductService } from '../services/product.service';
-import { ProductResponseDto } from 'src/dto/product.dto';
+import { DashboardProductCategoryDto } from 'src/dto/product.dto';
 import { AuthGuard } from 'src/guards/auth.guard';
 
 @ApiTags('categories')
@@ -46,6 +47,14 @@ export class CategoryController {
   @ApiResponse({ status: 200, type: [CategoryResponseDto] })
   findAll() {
     return this.categoryService.findAll();
+  }
+
+  @Get('store/:storeId')
+  @ApiOperation({ summary: 'Get categories by store ID' })
+  @ApiParam({ name: 'storeId', example: '652f1c2d9e4b1a2a3c1d2e3f4' })
+  @ApiResponse({ status: 200, type: [CategoryResponseDto] })
+  findByStore(@Param('storeId', new ParseObjectIdPipe()) storeId: string) {
+    return this.categoryService.findByStoreId(storeId);
   }
 
   @Get(':id')
@@ -150,15 +159,31 @@ export class CategoryController {
   @ApiOperation({ summary: 'Get dashboard categories based on app settings' })
   @ApiParam({ name: 'storeId', example: '652f1c2d9e4b1a2a3c1d2e3f4' })
   @ApiResponse({ status: 200, type: [CategoryResponseDto] })
-  getDashboardCategories(@Param('storeId', new ParseObjectIdPipe()) storeId: string) {
+  @ApiQuery({ name: 'debug', required: false, description: 'Return debug payload instead of plain list when true' })
+  getDashboardCategories(
+    @Param('storeId', new ParseObjectIdPipe()) storeId: string,
+    @Query('debug') debug?: string,
+  ) {
+    const dbg = String(debug || '').toLowerCase();
+    if (dbg === '1' || dbg === 'true') {
+      return this.categoryService.getDashboardCategoriesDebug(storeId);
+    }
     return this.categoryService.getDashboardCategories(storeId);
   }
 
   @Get('dashboard-products/:storeId')
 @ApiOperation({ summary: 'Get dashboard products based on category codes from app settings' })
 @ApiParam({ name: 'storeId', example: '652f1c2d9e4b1a2a3c1d2e3f4' })
-@ApiResponse({ status: 200, type: [ProductResponseDto] })
-getDashboardProducts(@Param('storeId', new ParseObjectIdPipe()) storeId: string) {
+@ApiResponse({ status: 200, type: [DashboardProductCategoryDto] })
+@ApiQuery({ name: 'debug', required: false, description: 'Return debug payload instead of plain list when true' })
+getDashboardProducts(
+  @Param('storeId', new ParseObjectIdPipe()) storeId: string,
+  @Query('debug') debug?: string,
+) {
+  const dbg = String(debug || '').toLowerCase();
+  if (dbg === '1' || dbg === 'true') {
+    return this.productService.getDashboardProductsDebug(storeId);
+  }
   return this.productService.getDashboardProducts(storeId);
 }
 }

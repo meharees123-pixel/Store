@@ -9,12 +9,6 @@ export class UserAddressDto {
     @ApiProperty({ description: 'State or province', required: false })
     state?: string;
 
-    @ApiProperty({
-        description: 'Delivery Location ID associated with this address',
-        example: '64f1c2d9e4b1a2a3c1d2e3f4',required: true
-    })
-    deliveryLocationId: string;
-
     @ApiProperty({ description: 'Country' })
     country: string;
 

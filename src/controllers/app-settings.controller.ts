@@ -7,9 +7,11 @@ import {
   Put,
   Delete,
   UseGuards,
+  Query,
+  BadRequestException,
 } from '@nestjs/common';
 import { ParseObjectIdPipe } from '../utils/parse-object-id.pipe';
-import { ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags, ApiParam, ApiQuery } from '@nestjs/swagger';
 import {
   CreateAppSettingsDto,
   UpdateAppSettingsDto,
@@ -17,6 +19,7 @@ import {
 } from '../dto/app-settings.dto';
 import { AppSettingsService } from '../services/app-settings.service';
 import { AuthGuard } from 'src/guards/auth.guard';
+import { Types } from 'mongoose';
 
 @ApiTags('app-settings')
 @UseGuards(AuthGuard)
@@ -33,8 +36,17 @@ export class AppSettingsController {
 
   @Get()
   @ApiOperation({ summary: 'Get all app settings' })
+  @ApiQuery({ name: 'storeId', required: false, description: 'Optional store scope (omit for global + all settings)' })
   @ApiResponse({ status: 200, type: [AppSettingsResponseDto] })
-  findAll() {
+  findAll(@Query('storeId') storeId?: string) {
+    if (storeId) {
+      const trimmed = String(storeId).trim();
+      if (!Types.ObjectId.isValid(trimmed)) {
+        throw new BadRequestException(`Invalid MongoDB ObjectId: ${trimmed}`);
+      }
+      return this.appSettingsService.findAllByStore(trimmed);
+    }
+
     return this.appSettingsService.findAll();
   }
 
