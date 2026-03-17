@@ -45,6 +45,8 @@ import { AppSettingsService } from './services/app-settings.service';
 
 import { AuthGuard } from './guards/auth.guard';
 import { GcsStorageService } from './services/gcs-storage.service';
+import { ReportsController } from './controllers/reports.controller';
+import { ReportsService } from './services/reports.service';
 //iQlUh3tTQkqfJ4A1
 @Module({
   imports: [
@@ -77,6 +79,7 @@ import { GcsStorageService } from './services/gcs-storage.service';
     CartController,
     OrderController,
     AppSettingsController,
+    ReportsController,
   ],
   providers: [
     UserService,
@@ -90,7 +93,8 @@ import { GcsStorageService } from './services/gcs-storage.service';
     OrderService,
     AppSettingsService,
     AuthGuard,
-    GcsStorageService
+    GcsStorageService,
+    ReportsService,
   ],
 })
 export class AppModule { }
