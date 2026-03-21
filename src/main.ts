@@ -3,8 +3,12 @@ import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { readFileSync } from 'fs';
 import { join } from 'path';
+import { loadEnvFromFile } from './utils/load-env';
 
 async function bootstrap() {
+  // Load Store/.env for local dev (without requiring extra dependencies).
+  loadEnvFromFile();
+
   const isHttps = process.env.HTTPS === 'true';
   const port = parseInt(process.env.PORT || (isHttps ? '443' : '3000'), 10);
 

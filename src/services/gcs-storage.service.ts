@@ -9,53 +9,14 @@ type UploadedObject = {
   contentType?: string;
 };
 
-const HARDCODED_GCS_CREDENTIALS = {
-  bucket: 'supercanteen-images',
-  projectId: 'supercanteen',
-  privateKeyId: 'a87493a026141f60f959794acf51abdc666a675c',
-  private_key:
-    '-----BEGIN PRIVATE KEY-----\n' +
-    'MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDKruvryRb35HjW\n' +
-    'v9YD7lFmpn5QmS15l5L0JK67/1TIa+cGE9eMfII85/isX1AsEgSdu4pT08i/dgVZ\n' +
-    '8FGnyJm4bUJJuiXbb62UREaFdbV8Aiw8QihZxuqK15s3Xdh6gTWGDC/WgP57K6ui\n' +
-    'OLgRLCLkW+nD4KfCDUb91MU2dGOLHxcMCtSChnaOGfK2KLLiiHxvntOt29ICoDzC\n' +
-    'vMrR75JYrm8CDIC3Ra9Au445TTD8EoN++pVzNOE63/Cw8w+ls0OgqvzquufIS098\n' +
-    '/bvZ1fXbusncy79/l5ZYFxBGjB0iFSTSGzuaPlgp28XgvZGwdd3Ze/EqqgixWFyq\n' +
-    'UPWuOWwHAgMBAAECggEALX4xqgzKwP1hOiJ48Qzu7HF2bLTVBjPFYlNRfRUEfK/r\n' +
-    'fOu7N+dCfFU89cO3BQ1OR/EuTT5+Eqt07AkK6vQVvNWZSV8k3Com9d6VTaNsBtee\n' +
-    'AjB/Shdh0aQvTLAdxPF3iAz4N9dgR1k3/wNoHUKg2kzfHX4xaVb9lj/JvD1HkpQT\n' +
-    'mGqg0e6QhC41o6oVwlgNkHsrfTQZHM3Uvw5euf5DcMivVWn6zfTeN7JrlFqeYrRn\n' +
-    'bnCAkGd8dVazF5BuWc8RVkG167cusWzrcZOgydEI5hk5Cv8ZcG6gGMHzsMfSJSLr\n' +
-    '2ZkHc1/7ZEEPIhhAZow2z2F2uk+k3vgbQFdczBwAoQKBgQDphmQGqx53bAnwILVk\n' +
-    'ZCb89W7H42Vys3zm4r4f3wgr2Nu+6rSLNyMASiYUaFCvqBtz3T1Bk/WoICfiEVAP\n' +
-    'paTdTt+dSPnDMtip0xWtwaR0FPKF3jfDBhGxQzegobKzp6ZeBn1J+4q1b9eBNqxt\n' +
-    'ZFUe6Y6ilH4F/H2rt++zVg80zwKBgQDeMKabx8EO2j6eaeC2c9Z7vmUpMhZ5vwYS\n' +
-    'OyII4nVH0RfqWuobTR1+ibLmVCrsghq8L8APUqD6k/a8VkX/yYZkRxc2mvKzLKcn\n' +
-    'ljjnVHscFnOhuU+napcLjZ1mncrG/GpfsLJJiJMl6EQu4+z4Lxa7mlVpHOaER4ut\n' +
-    'Wp0s+4gTSQKBgDrQqDytuHynb1FVS5o/RzqKrh4V/aUH47ta/DuWtr4kXiQVhOdT\n' +
-    'ObOG+VRGeZvkIRXrcNQlacewYZskdR+bvowmo1c/2/f3xG3xRhJ/JOY/qF1i/HRY\n' +
-    'APi+TzJbx2BMJzCjPcb2XZcY1hQrKv5aOL4SYOQ9tgfX8ebf6rUmRaotAoGAIOVl\n' +
-    'FXVasP9A/CVC3uCBpeqHgbTnvPi6RmK45EXbBVoAx3LUbFxbfIuYkB9wB3ovySLs\n' +
-    'tZgPO2pCwpmnXXqRyjD4T95bBooa6XKFVEKew4bTceNE1s2iNVSvNC0yg4mFmktH\n' +
-    '6jktSBR+W87lG82k+Pudn6Vmv7j0BiN/V9SZzfkCgYBKDWzNDqntdvPqZE7kdv5I\n' +
-    'LetWdpLT3RyIZQnqND53Rp6u6niha4IKhjf/pNTI5/qVJ0ybwSyRloBoiSxNvCxE\n' +
-    'xTBRAXakTcOWCHET4zcmAXr0b7S6ZIBw7ntQJ8khBLIFl4PgOcGvNxfvF00GZSkK\n' +
-    'eBODI8gR5T/ts3E1JyhdDg==\n' +
-    '-----END PRIVATE KEY-----\n',
-  client_email: '458693559879-compute@developer.gserviceaccount.com',
-  client_id: '115231375108021903775',
-  auth_uri: 'https://accounts.google.com/o/oauth2/auth',
-  token_uri: 'https://oauth2.googleapis.com/token',
-  auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
-  client_x509_cert_url:
-    'https://www.googleapis.com/robot/v1/metadata/x509/458693559879-compute@developer.gserviceaccount.com',
-  universe_domain: 'googleapis.com',
-} as const;
-
 @Injectable()
 export class GcsStorageService {
   private getBucketName(): string {
-    return HARDCODED_GCS_CREDENTIALS.bucket;
+    const bucket = process.env.GCS_BUCKET;
+    if (!bucket) {
+      throw new InternalServerErrorException('GCS_BUCKET is not set');
+    }
+    return bucket;
   }
 
   private getStorageClient(): any {
@@ -65,13 +26,44 @@ export class GcsStorageService {
       // Credentials are picked up from GOOGLE_APPLICATION_CREDENTIALS (service account JSON path) or other ADC sources.
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { Storage } = require('@google-cloud/storage');
-      return new Storage({
-        projectId: HARDCODED_GCS_CREDENTIALS.projectId,
-        credentials: {
-          client_email: HARDCODED_GCS_CREDENTIALS.client_email,
-          private_key: HARDCODED_GCS_CREDENTIALS.private_key,
-        },
-      });
+      const keyFilename = process.env.GCS_KEYFILE || process.env.GOOGLE_APPLICATION_CREDENTIALS;
+      const credentialsJson = process.env.GCS_CREDENTIALS_JSON;
+
+      if (credentialsJson) {
+        const parsed = JSON.parse(credentialsJson);
+        return new Storage({
+          projectId: parsed.project_id,
+          credentials: {
+            client_email: parsed.client_email,
+            private_key: parsed.private_key,
+          },
+        });
+      }
+
+      if (keyFilename) {
+        return new Storage({ keyFilename });
+      }
+
+      // Local-dev fallback (no env vars): load a key file from Store/.secrets/.
+      // IMPORTANT: never commit this file. It's ignored via .gitignore.
+      const cwd = process.cwd();
+      const localKeyCandidates = [
+        `${cwd}/.secrets/gcs-service-account.json`,
+        `${cwd}/.secrets/gcs.json`,
+      ];
+      for (const candidate of localKeyCandidates) {
+        if (!existsSync(candidate)) continue;
+        const parsed = JSON.parse(readFileSync(candidate, 'utf8'));
+        return new Storage({
+          projectId: parsed.project_id,
+          credentials: {
+            client_email: parsed.client_email,
+            private_key: parsed.private_key,
+          },
+        });
+      }
+
+      return new Storage();
     } catch (e) {
       throw new InternalServerErrorException(
         'Google Cloud Storage client not available. Install @google-cloud/storage and configure GOOGLE_APPLICATION_CREDENTIALS.',
