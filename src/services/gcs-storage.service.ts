@@ -1,7 +1,7 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
-import { extname } from 'path';
+import { dirname, extname, isAbsolute, join } from 'path';
 
 type UploadedObject = {
   publicUrl: string;
@@ -9,8 +9,20 @@ type UploadedObject = {
   contentType?: string;
 };
 
+type ServiceAccountCredentials = {
+  projectId: string;
+  credentials: {
+    client_email: string;
+    private_key: string;
+  };
+};
+
 @Injectable()
 export class GcsStorageService {
+  private storageClient?: any;
+  private secretClient?: any;
+  private credentialsPromise?: Promise<ServiceAccountCredentials | null>;
+
   private getBucketName(): string {
     const bucket = process.env.GCS_BUCKET;
     if (!bucket) {
@@ -19,56 +31,141 @@ export class GcsStorageService {
     return bucket;
   }
 
-  private getStorageClient(): any {
+  private async getStorageClient(): Promise<any> {
+    if (this.storageClient) return this.storageClient;
     try {
       // Keep this as require() so the project can still compile even if the dependency isn't installed yet.
       // Install it with: npm i @google-cloud/storage
       // Credentials are picked up from GOOGLE_APPLICATION_CREDENTIALS (service account JSON path) or other ADC sources.
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { Storage } = require('@google-cloud/storage');
-      const keyFilename = process.env.GCS_KEYFILE || process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
       const credentialsJson = process.env.GCS_CREDENTIALS_JSON;
-
       if (credentialsJson) {
-        const parsed = JSON.parse(credentialsJson);
-        return new Storage({
-          projectId: parsed.project_id,
-          credentials: {
-            client_email: parsed.client_email,
-            private_key: parsed.private_key,
-          },
+        const parsed = this.parseServiceAccount(credentialsJson);
+        this.storageClient = new Storage({
+          projectId: parsed.projectId,
+          credentials: parsed.credentials,
         });
+        return this.storageClient;
       }
 
+      const keyFilename = process.env.GCS_KEYFILE || process.env.GOOGLE_APPLICATION_CREDENTIALS;
       if (keyFilename) {
-        return new Storage({ keyFilename });
+        const resolved = this.findFileUpwards(keyFilename);
+        if (resolved) {
+          this.storageClient = new Storage({ keyFilename: resolved });
+          return this.storageClient;
+        }
       }
 
-      // Local-dev fallback (no env vars): load a key file from Store/.secrets/.
-      // IMPORTANT: never commit this file. It's ignored via .gitignore.
-      const cwd = process.cwd();
-      const localKeyCandidates = [
-        `${cwd}/.secrets/gcs-service-account.json`,
-        `${cwd}/.secrets/gcs.json`,
-      ];
-      for (const candidate of localKeyCandidates) {
-        if (!existsSync(candidate)) continue;
-        const parsed = JSON.parse(readFileSync(candidate, 'utf8'));
-        return new Storage({
-          projectId: parsed.project_id,
-          credentials: {
-            client_email: parsed.client_email,
-            private_key: parsed.private_key,
-          },
+      const credentials = await this.loadCredentials();
+      if (credentials) {
+        this.storageClient = new Storage({
+          projectId: credentials.projectId,
+          credentials: credentials.credentials,
         });
+        return this.storageClient;
       }
 
-      return new Storage();
+      this.storageClient = new Storage();
+      return this.storageClient;
     } catch (e) {
       throw new InternalServerErrorException(
         'Google Cloud Storage client not available. Install @google-cloud/storage and configure GOOGLE_APPLICATION_CREDENTIALS.',
       );
     }
+  }
+
+  private parseServiceAccount(raw: string): ServiceAccountCredentials {
+    const parsed = JSON.parse(raw);
+    const projectId = parsed.project_id || parsed.projectId;
+    const clientEmail = parsed.client_email || parsed.clientEmail;
+    const privateKey = parsed.private_key || parsed.privateKey;
+    if (!projectId || !clientEmail || !privateKey) {
+      throw new InternalServerErrorException('Service account credentials are missing required fields.');
+    }
+    return {
+      projectId,
+      credentials: {
+        client_email: clientEmail,
+        private_key: privateKey,
+      },
+    };
+  }
+
+  private async loadCredentials(): Promise<ServiceAccountCredentials | null> {
+    if (this.credentialsPromise) return this.credentialsPromise;
+    this.credentialsPromise = this.resolveCredentials();
+    return this.credentialsPromise;
+  }
+
+  private async resolveCredentials(): Promise<ServiceAccountCredentials | null> {
+    let secretName = process.env.GCS_SECRET_NAME;
+    if (secretName) {
+      if (!secretName.includes('/versions/')) {
+        if (secretName.endsWith('/')) {
+          secretName = `${secretName}versions/latest`;
+        } else {
+          secretName = `${secretName}/versions/latest`;
+        }
+      }
+      try {
+        const client = await this.getSecretManagerClient();
+        const [version] = await client.accessSecretVersion({ name: secretName });
+        const payload = version.payload?.data?.toString('utf8');
+        if (payload) {
+          return this.parseServiceAccount(payload);
+        }
+      } catch {
+        // Silently fall back to local files
+      }
+    }
+
+    return this.loadLocalCredentials();
+  }
+
+  private loadLocalCredentials(): ServiceAccountCredentials | null {
+    const cwd = process.cwd();
+    const localKeyCandidates = [
+      join(cwd, '.secrets', 'gcs-service-account.json'),
+      join(cwd, '.secrets', 'gcs.json'),
+    ];
+    for (const candidate of localKeyCandidates) {
+      const resolved = this.findFileUpwards(candidate);
+      if (!resolved) continue;
+      try {
+        const raw = readFileSync(resolved, 'utf8');
+        return this.parseServiceAccount(raw);
+      } catch {
+        continue;
+      }
+    }
+    return null;
+  }
+
+  private async getSecretManagerClient(): Promise<any> {
+    if (this.secretClient) return this.secretClient;
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { SecretManagerServiceClient } = require('@google-cloud/secret-manager');
+    this.secretClient = new SecretManagerServiceClient();
+    return this.secretClient;
+  }
+
+  private findFileUpwards(filePath: string): string | null {
+    const normalized = isAbsolute(filePath) ? filePath : join(process.cwd(), filePath);
+    if (existsSync(normalized)) return normalized;
+    if (isAbsolute(filePath)) return null;
+
+    let dir = process.cwd();
+    while (true) {
+      const candidate = join(dir, filePath);
+      if (existsSync(candidate)) return candidate;
+      const parent = dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+    return null;
   }
 
   async uploadImage(params: {
@@ -79,7 +176,7 @@ export class GcsStorageService {
     originalName?: string;
   }): Promise<UploadedObject> {
     const bucketName = this.getBucketName();
-    const storage = this.getStorageClient();
+    const storage = await this.getStorageClient();
     const bucket = storage.bucket(bucketName);
 
     const safeExt =
@@ -98,10 +195,6 @@ export class GcsStorageService {
         },
       });
 
-      // Optional: attempt to make the object public.
-      // NOTE: If your bucket has Uniform Bucket-Level Access enabled, per-object ACL updates are not allowed
-      // and this call will fail. In that case, configure bucket-level IAM for public read (if desired),
-      // or serve images via signed URLs / a proxy endpoint.
       if (process.env.GCS_MAKE_PUBLIC !== 'false') {
         try {
           await file.makePublic();
@@ -112,7 +205,6 @@ export class GcsStorageService {
             msg.includes('Uniform bucket-level access') ||
             msg.includes('uniformBucketLevelAccess');
           if (!uniformAccess) throw e;
-          // Ignore UBLA errors: upload succeeded, but object ACL cannot be changed.
         }
       }
 
@@ -134,7 +226,7 @@ export class GcsStorageService {
     const objectName = withoutQuery.slice(prefix.length);
     if (!objectName) return;
 
-    const storage = this.getStorageClient();
+    const storage = await this.getStorageClient();
     const bucket = storage.bucket(bucketName);
     try {
       await bucket.file(objectName).delete({ ignoreNotFound: true });
