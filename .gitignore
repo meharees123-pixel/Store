@@ -140,5 +140,5 @@ vite.config.ts.timestamp-*
 
 # Secrets (never commit)
 .secrets/
-# supercanteen.json
-# supercanteen-*.json
+supercanteen.json
+supercanteen-*.json
