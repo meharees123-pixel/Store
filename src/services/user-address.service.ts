@@ -18,12 +18,17 @@ export class UserAddressService {
     return this.addressModel.create(dto);
   }
 
-  async findAll(): Promise<UserAddress[]> {
-    return this.addressModel.find().exec();
+  async findAll(storeId?: string): Promise<UserAddress[]> {
+    const filter = storeId ? { storeId } : {};
+    return this.addressModel.find(filter).exec();
   }
 
-  async findByUser(userId: string): Promise<UserAddress[]> {
-    return this.addressModel.find({ userId }).exec();
+  async findByUser(userId: string, storeId?: string): Promise<UserAddress[]> {
+    const filter: Record<string, unknown> = { userId };
+    if (storeId) {
+      filter.storeId = storeId;
+    }
+    return this.addressModel.find(filter).exec();
   }
 
   async findOne(id: string): Promise<UserAddress & Document> {

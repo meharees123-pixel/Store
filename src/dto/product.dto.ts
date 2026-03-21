@@ -10,6 +10,9 @@ export class ProductDto {
   @ApiProperty({ description: 'Product price', example: 999.99 })
   price: number;
 
+  @ApiProperty({ description: 'Maximum Retail Price (MRP)', example: 1099.99, required: false })
+  mrp?: number;
+
   @ApiProperty({ description: 'Product image URL' })
   productImage?: string;
 

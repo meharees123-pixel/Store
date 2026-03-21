@@ -155,6 +155,80 @@ export class CategoryController {
     return this.categoryService.deleteCategoryImage({ id, userId });
   }
 
+  @Post(':id/icon')
+  @ApiOperation({ summary: 'Upload category icon image' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        icon: { type: 'string', format: 'binary' },
+      },
+      required: ['icon'],
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('icon', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        if (!file.mimetype?.startsWith('image/')) {
+          return cb(new BadRequestException('Only image files are allowed') as any, false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  uploadIcon(
+    @Param('id', new ParseObjectIdPipe()) id: string,
+    @UploadedFile() file: any,
+    @Req() request: Request,
+  ) {
+    const userId = request.user?.id;
+    return this.categoryService.uploadCategoryIcon({ id, file, userId });
+  }
+
+  @Put(':id/icon')
+  @ApiOperation({ summary: 'Replace category icon image' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        icon: { type: 'string', format: 'binary' },
+      },
+      required: ['icon'],
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('icon', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        if (!file.mimetype?.startsWith('image/')) {
+          return cb(new BadRequestException('Only image files are allowed') as any, false);
+        }
+        cb(null, true);
+      },
+    }),
+  )
+  replaceIcon(
+    @Param('id', new ParseObjectIdPipe()) id: string,
+    @UploadedFile() file: any,
+    @Req() request: Request,
+  ) {
+    const userId = request.user?.id;
+    return this.categoryService.uploadCategoryIcon({ id, file, userId });
+  }
+
+  @Delete(':id/icon')
+  @ApiOperation({ summary: 'Delete category icon image' })
+  @ApiResponse({ status: 200, type: CategoryResponseDto })
+  deleteIcon(@Param('id', new ParseObjectIdPipe()) id: string, @Req() request: Request) {
+    const userId = request.user?.id;
+    return this.categoryService.deleteCategoryIcon({ id, userId });
+  }
+
   @Get('dashboard-categories/:storeId')
   @ApiOperation({ summary: 'Get dashboard categories based on app settings' })
   @ApiParam({ name: 'storeId', example: '652f1c2d9e4b1a2a3c1d2e3f4' })

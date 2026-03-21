@@ -2,6 +2,7 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, SchemaTypes } from 'mongoose';
 import { ApiProperty } from '@nestjs/swagger';
 import { AuditModel, AuditSchema } from './audit.model';
+import { Store } from './store.model';
 import { User } from './user.model';
 
 @Schema()
@@ -25,6 +26,10 @@ export class UserAddress extends AuditModel {
     @ApiProperty({ description: 'User ID this address belongs to', example: '64f1c2d9e4b1a2a3c1d2e3f4' })
     @Prop({ type: SchemaTypes.ObjectId, ref: User.name, required: true })
     userId: string;
+
+    @ApiProperty({ description: 'Store ID this address belongs to', example: '64f1c2d9e4b1a2a3c1d2e3f4', required: false })
+    @Prop({ type: SchemaTypes.ObjectId, ref: Store.name })
+    storeId?: string;
 }
 
 export type UserAddressDocument = UserAddress & Document;

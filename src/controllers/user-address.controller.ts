@@ -7,9 +7,10 @@ import {
   Put,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { ParseObjectIdPipe } from '../utils/parse-object-id.pipe';
-import { ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags, ApiParam, ApiQuery } from '@nestjs/swagger';
 import {
   CreateUserAddressDto,
   UpdateUserAddressDto,
@@ -34,16 +35,21 @@ export class UserAddressController {
   @Get()
   @ApiOperation({ summary: 'Get all user addresses' })
   @ApiResponse({ status: 200, type: [UserAddressResponseDto] })
-  findAll() {
-    return this.addressService.findAll();
+  @ApiQuery({ name: 'storeId', required: false, description: 'Filter by store (optional)' })
+  findAll(@Query('storeId') storeId?: string) {
+    return this.addressService.findAll(storeId);
   }
 
   @Get('user/:userId')
   @ApiOperation({ summary: 'Get addresses by user ID' })
   @ApiParam({ name: 'userId', example: '64f1c2d9e4b1a2a3c1d2e3f4' })
+  @ApiQuery({ name: 'storeId', required: false, description: 'Optional store filter' })
   @ApiResponse({ status: 200, type: [UserAddressResponseDto] })
-  findByUser(@Param('userId', new ParseObjectIdPipe()) userId: string) {
-    return this.addressService.findByUser(userId);
+  findByUser(
+    @Param('userId', new ParseObjectIdPipe()) userId: string,
+    @Query('storeId') storeId?: string,
+  ) {
+    return this.addressService.findByUser(userId, storeId);
   }
 
   @Get(':id')

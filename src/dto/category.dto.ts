@@ -14,6 +14,9 @@ export class CategoryDto {
   @ApiProperty({ description: 'Image URL associated with the category' })
   categoryImage?: string;
 
+  @ApiProperty({ description: 'Icon image URL for the category' })
+  categoryIconImage?: string;
+
   @ApiProperty({
     description: 'Store ID to which this category belongs',
     example: '64f1c2d9e4b1a2a3c1d2e3f4',
