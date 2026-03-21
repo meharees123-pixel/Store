@@ -20,6 +20,10 @@ export class Product extends AuditModel {
   @Prop({ required: true })
   price: number;
 
+  @ApiProperty({ description: 'Maximum Retail Price (MRP)', example: 1099.99, required: false })
+  @Prop()
+  mrp?: number;
+
   @ApiProperty({ description: 'Product image URL', example: 'https://example.com/iphone.jpg' })
   @Prop()
   productImage?: string;

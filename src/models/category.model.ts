@@ -18,6 +18,10 @@ export class Category extends AuditModel {
   @Prop()
   categoryImage?: string;
 
+  @ApiProperty({ description: 'Icon image URL for the category', example: 'https://example.com/cat1-icon.jpg' })
+  @Prop()
+  categoryIconImage?: string;
+
   @ApiProperty({ description: 'Description of the category', example: 'Fresh seasonal vegetables' })
   @Prop()
   description?: string;

@@ -142,6 +142,34 @@ export class CategoryService {
     return category;
   }
 
+  async uploadCategoryIcon(params: {
+    id: string;
+    file: { buffer: Buffer; mimetype?: string; originalname?: string };
+    userId?: string;
+  }) {
+    const { id, file, userId } = params;
+    if (!file?.buffer) throw new BadRequestException('Missing icon file');
+
+    const category = await this.categoryModel.findById(id).exec();
+    if (!category) throw new NotFoundException('Category not found');
+
+    await this.gcsStorage.deleteByPublicUrl(category.categoryIconImage);
+
+    const uploaded = await this.gcsStorage.uploadImage({
+      folder: 'category-icons',
+      entityId: id,
+      buffer: file.buffer,
+      mimeType: file.mimetype,
+      originalName: file.originalname,
+    });
+
+    category.categoryIconImage = uploaded.publicUrl;
+    if (userId) category.updatedBy = userId;
+    await category.save();
+
+    return category;
+  }
+
   async deleteCategoryImage(params: { id: string; userId?: string }) {
     const { id, userId } = params;
     const category = await this.categoryModel.findById(id).exec();
@@ -149,6 +177,19 @@ export class CategoryService {
 
     await this.gcsStorage.deleteByPublicUrl(category.categoryImage);
     category.categoryImage = undefined;
+    if (userId) category.updatedBy = userId;
+    await category.save();
+
+    return category;
+  }
+
+  async deleteCategoryIcon(params: { id: string; userId?: string }) {
+    const { id, userId } = params;
+    const category = await this.categoryModel.findById(id).exec();
+    if (!category) throw new NotFoundException('Category not found');
+
+    await this.gcsStorage.deleteByPublicUrl(category.categoryIconImage);
+    category.categoryIconImage = undefined;
     if (userId) category.updatedBy = userId;
     await category.save();
 

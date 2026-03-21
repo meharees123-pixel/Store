@@ -15,6 +15,9 @@ export class UserAddressDto {
     @ApiProperty({ description: 'User ID this address belongs to',example: '64f1c2d9e4b1a2a3c1d2e3f4',required: true })
     userId: string;
 
+    @ApiProperty({ description: 'Store ID this address belongs to', example: '64f1c2d9e4b1a2a3c1d2e3f4', required: false })
+    storeId?: string;
+
     @ApiProperty()
     isActive: boolean;
 }
