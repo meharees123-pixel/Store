@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { existsSync, readFileSync } from 'fs';
 import { dirname, extname, isAbsolute, join } from 'path';
+import { AppSettingsService } from './app-settings.service';
 
 type UploadedObject = {
   publicUrl: string;
@@ -20,8 +21,10 @@ type ServiceAccountCredentials = {
 @Injectable()
 export class GcsStorageService {
   private storageClient?: any;
-  private secretClient?: any;
+  private storageClientPromise?: Promise<any>;
   private credentialsPromise?: Promise<ServiceAccountCredentials | null>;
+
+  constructor(private readonly appSettingsService: AppSettingsService) {}
 
   private getBucketName(): string {
     const bucket = process.env.GCS_BUCKET;
@@ -33,48 +36,44 @@ export class GcsStorageService {
 
   private async getStorageClient(): Promise<any> {
     if (this.storageClient) return this.storageClient;
-    try {
-      // Keep this as require() so the project can still compile even if the dependency isn't installed yet.
-      // Install it with: npm i @google-cloud/storage
-      // Credentials are picked up from GOOGLE_APPLICATION_CREDENTIALS (service account JSON path) or other ADC sources.
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
-      const { Storage } = require('@google-cloud/storage');
+    if (this.storageClientPromise) return this.storageClientPromise;
 
-      const credentialsJson = process.env.GCS_CREDENTIALS_JSON;
-      if (credentialsJson) {
-        const parsed = this.parseServiceAccount(credentialsJson);
-        this.storageClient = new Storage({
-          projectId: parsed.projectId,
-          credentials: parsed.credentials,
-        });
-        return this.storageClient;
-      }
+    this.storageClientPromise = (async () => {
+      try {
+        // Keep this as require() so the project can still compile even if the dependency isn't installed yet.
+        // Install it with: npm i @google-cloud/storage
+        // Credentials are picked up from the DB, env vars, or local secrets.
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { Storage } = require('@google-cloud/storage');
 
-      const keyFilename = process.env.GCS_KEYFILE || process.env.GOOGLE_APPLICATION_CREDENTIALS;
-      if (keyFilename) {
-        const resolved = this.findFileUpwards(keyFilename);
-        if (resolved) {
-          this.storageClient = new Storage({ keyFilename: resolved });
+        const dbCreds = await this.loadCredentialsFromAppSettings();
+        if (dbCreds) {
+          this.storageClient = new Storage({
+            projectId: dbCreds.projectId,
+            credentials: dbCreds.credentials,
+          });
           return this.storageClient;
         }
-      }
 
-      const credentials = await this.loadCredentials();
-      if (credentials) {
-        this.storageClient = new Storage({
-          projectId: credentials.projectId,
-          credentials: credentials.credentials,
-        });
+        const credentials = await this.findServiceAccountCredentials();
+        if (credentials) {
+          this.storageClient = new Storage({
+            projectId: credentials.projectId,
+            credentials: credentials.credentials,
+          });
+          return this.storageClient;
+        }
+
+        this.storageClient = new Storage();
         return this.storageClient;
+      } catch (e) {
+        throw new InternalServerErrorException(
+          'Google Cloud Storage client not available. Install @google-cloud/storage and configure GOOGLE_APPLICATION_CREDENTIALS.',
+        );
       }
+    })();
 
-      this.storageClient = new Storage();
-      return this.storageClient;
-    } catch (e) {
-      throw new InternalServerErrorException(
-        'Google Cloud Storage client not available. Install @google-cloud/storage and configure GOOGLE_APPLICATION_CREDENTIALS.',
-      );
-    }
+    return this.storageClientPromise;
   }
 
   private parseServiceAccount(raw: string): ServiceAccountCredentials {
@@ -94,44 +93,50 @@ export class GcsStorageService {
     };
   }
 
-  private async loadCredentials(): Promise<ServiceAccountCredentials | null> {
-    if (this.credentialsPromise) return this.credentialsPromise;
-    this.credentialsPromise = this.resolveCredentials();
-    return this.credentialsPromise;
+  private async loadCredentialsFromAppSettings(): Promise<ServiceAccountCredentials | null> {
+    try {
+      const setting = await this.appSettingsService.findGlobalByKey('GCLOUDKEY');
+      if (!setting?.value) return null;
+      return this.parseServiceAccount(setting.value);
+    } catch {
+      return null;
+    }
   }
 
-  private async resolveCredentials(): Promise<ServiceAccountCredentials | null> {
-    let secretName = process.env.GCS_SECRET_NAME;
-    if (secretName) {
-      if (!secretName.includes('/versions/')) {
-        if (secretName.endsWith('/')) {
-          secretName = `${secretName}versions/latest`;
-        } else {
-          secretName = `${secretName}/versions/latest`;
-        }
+  private async findServiceAccountCredentials(): Promise<ServiceAccountCredentials | null> {
+    if (this.credentialsPromise) return this.credentialsPromise;
+    this.credentialsPromise = (async () => {
+      const credentialsJson = process.env.GCS_CREDENTIALS_JSON;
+      if (credentialsJson) {
+        return this.parseServiceAccount(credentialsJson);
       }
-      try {
-        const client = await this.getSecretManagerClient();
-        const [version] = await client.accessSecretVersion({ name: secretName });
-        const payload = version.payload?.data?.toString('utf8');
-        if (payload) {
-          return this.parseServiceAccount(payload);
-        }
-      } catch {
-        // Silently fall back to local files
-      }
-    }
 
-    return this.loadLocalCredentials();
+      const keyFilename = process.env.GCS_KEYFILE || process.env.GOOGLE_APPLICATION_CREDENTIALS;
+      if (keyFilename) {
+        const resolved = this.findFileUpwards(keyFilename);
+        if (resolved) {
+          try {
+            const raw = readFileSync(resolved, 'utf8');
+            return this.parseServiceAccount(raw);
+          } catch {
+            // Continue to fallback to local secrets.
+          }
+        }
+      }
+
+      return this.loadLocalCredentials();
+    })();
+    return this.credentialsPromise;
   }
 
   private loadLocalCredentials(): ServiceAccountCredentials | null {
     const cwd = process.cwd();
-    const localKeyCandidates = [
+    const candidates = [
       join(cwd, '.secrets', 'gcs-service-account.json'),
       join(cwd, '.secrets', 'gcs.json'),
+      join(cwd, 'supercateen.json'),
     ];
-    for (const candidate of localKeyCandidates) {
+    for (const candidate of candidates) {
       const resolved = this.findFileUpwards(candidate);
       if (!resolved) continue;
       try {
@@ -142,14 +147,6 @@ export class GcsStorageService {
       }
     }
     return null;
-  }
-
-  private async getSecretManagerClient(): Promise<any> {
-    if (this.secretClient) return this.secretClient;
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { SecretManagerServiceClient } = require('@google-cloud/secret-manager');
-    this.secretClient = new SecretManagerServiceClient();
-    return this.secretClient;
   }
 
   private findFileUpwards(filePath: string): string | null {
