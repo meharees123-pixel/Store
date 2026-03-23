@@ -56,8 +56,28 @@ export class CartService {
         return this.cartModel.find().exec();
     }
 
-    async findByUser(userId: string): Promise<Cart[]> {
-        return this.cartModel.find({ userId }).exec();
+    async findByUser(userId: string): Promise<(Cart & { product?: Product })[]> {
+        const carts = await this.cartModel.find({ userId }).lean().exec();
+        if (!carts.length) return carts as (Cart & { product?: Product })[];
+
+        const productIds = Array.from(
+            new Set(
+                carts
+                    .map((cart) => this.normalizeId(cart.productId))
+                    .filter((id): id is string => Boolean(id)),
+            ),
+        );
+
+        const products = await this.productModel
+            .find({ _id: { $in: productIds } })
+            .lean()
+            .exec();
+        const productMap = new Map(products.map((product) => [product._id?.toString() ?? '', product]));
+
+        return carts.map((cart) => ({
+            ...cart,
+            product: productMap.get(this.normalizeId(cart.productId) ?? ''),
+        }));
     }
 
     async findOne(id: string): Promise<Cart & Document> {
@@ -153,5 +173,14 @@ export class CartService {
             storeId: params.storeId,
         });
         return { count };
+    }
+
+    private normalizeId(value: unknown): string | null {
+        if (!value) return null;
+        if (typeof value === 'string') return value;
+        if (typeof value === 'object' && value !== null && 'toString' in value) {
+            return (value as { toString(): string }).toString();
+        }
+        return String(value);
     }
 }

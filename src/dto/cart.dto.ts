@@ -48,3 +48,8 @@ export class CartResponseDto extends CartDto {
     @ApiProperty()
     isActive: boolean;
 }
+
+export class CartWithProductResponseDto extends CartResponseDto {
+    @ApiProperty({ type: Object, required: false })
+    product?: any;
+}

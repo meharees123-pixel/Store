@@ -14,6 +14,7 @@ import {
   CreateCartDto,
   UpdateCartDto,
   CartResponseDto,
+  CartWithProductResponseDto,
 } from '../dto/cart.dto';
 import { CartService } from '../services/cart.service';
 import { AuthGuard } from 'src/guards/auth.guard';
@@ -41,7 +42,7 @@ export class CartController {
   @Get('user/:userId')
   @ApiOperation({ summary: 'Get cart items by user ID' })
   @ApiParam({ name: 'userId', example: '64f1c2d9e4b1a2a3c1d2e3f4' })
-  @ApiResponse({ status: 200, type: [CartResponseDto] })
+  @ApiResponse({ status: 200, type: [CartWithProductResponseDto] })
   findByUser(@Param('userId', new ParseObjectIdPipe()) userId: string) {
     return this.cartService.findByUser(userId);
   }
