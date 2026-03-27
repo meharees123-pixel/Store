@@ -14,6 +14,7 @@ import {
   CreateOrderDto,
   UpdateOrderDto,
   OrderResponseDto,
+  OrderSummaryDto,
 } from '../dto/order.dto';
 import { OrderService } from '../services/order.service';
 import { AuthGuard } from 'src/guards/auth.guard';
@@ -41,7 +42,7 @@ export class OrderController {
   @Get('user/:userId')
   @ApiOperation({ summary: 'Get orders by user ID' })
   @ApiParam({ name: 'userId', example: '64f1c2d9e4b1a2a3c1d2e3f4' })
-  @ApiResponse({ status: 200, type: [OrderResponseDto] })
+  @ApiResponse({ status: 200, type: [OrderSummaryDto] })
   findByUser(@Param('userId', new ParseObjectIdPipe()) userId: string) {
     return this.orderService.findByUser(userId);
   }

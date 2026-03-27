@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { OrderStatus } from '../constants/order-status';
+import { CartProductSummaryDto } from './cart.dto';
 
 export class CreateOrderDto {
   @ApiProperty()
@@ -73,4 +74,39 @@ export class OrderResponseDto {
 
   @ApiProperty()
   isActive: boolean;
+}
+
+export class OrderSummaryDto {
+  @ApiProperty()
+  orderId: string;
+
+  @ApiProperty()
+  userId: string;
+
+  @ApiProperty()
+  storeId: string;
+
+  @ApiProperty({ required: false })
+  userAddressId?: string;
+
+  @ApiProperty({ required: false })
+  deliveryLocationId?: string;
+
+  @ApiProperty()
+  deliveryTime: string;
+
+  @ApiProperty()
+  deliveryCharge: string;
+
+  @ApiProperty()
+  handlingCharge: string;
+
+  @ApiProperty({ description: 'Sum of MRPs minus sum of total prices' })
+  TotalSaving: string;
+
+  @ApiProperty({ description: 'Total bill including delivery and handling charges' })
+  TatalBill: string;
+
+  @ApiProperty({ type: [CartProductSummaryDto] })
+  products: CartProductSummaryDto[];
 }

@@ -1,9 +1,10 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { CreateCartDto, UpdateCartDto } from '../dto/cart.dto';
+import { FilterQuery, Model } from 'mongoose';
+import { CreateCartDto, UpdateCartDto, CartSummaryDto, CartProductSummaryDto } from '../dto/cart.dto';
 import { Cart } from '../models/cart.model';
 import { Product } from '../models/product.model';
+import { AppSettingsService } from './app-settings.service';
 
 @Injectable()
 export class CartService {
@@ -13,6 +14,8 @@ export class CartService {
 
         @InjectModel(Product.name)
         private readonly productModel: Model<Product & Document>,
+
+        private readonly appSettingsService: AppSettingsService,
     ) { }
 
     async create(dto: CreateCartDto): Promise<Cart & Document> {
@@ -33,6 +36,25 @@ export class CartService {
         const storeId = (product as any).storeId || dto.storeId;
         if (!storeId) {
             throw new BadRequestException('storeId is required');
+        }
+        const existingCart = await this.cartModel
+            .findOne({ userId: dto.userId, storeId, productId: dto.productId })
+            .exec();
+
+        const desiredQuantity = (existingCart?.quantity ?? 0) + dto.quantity;
+        if (desiredQuantity > product.quantity) {
+            throw new BadRequestException(`Only ${product.quantity} units available`);
+        }
+
+        if (existingCart) {
+            existingCart.quantity = desiredQuantity;
+            existingCart.unitPrice = product.price;
+            existingCart.totalPrice = product.price * desiredQuantity;
+            existingCart.userAddressId = dto.userAddressId ?? dto.addressId ?? existingCart.userAddressId;
+            existingCart.deliveryLocationId = dto.deliveryLocationId ?? existingCart.deliveryLocationId;
+            existingCart.addressId = dto.addressId ?? existingCart.addressId;
+            const updated = await existingCart.save();
+            return updated;
         }
 
         const cartItem = new this.cartModel({
@@ -57,27 +79,45 @@ export class CartService {
     }
 
     async findByUser(userId: string): Promise<(Cart & { product?: Product })[]> {
-        const carts = await this.cartModel.find({ userId }).lean().exec();
-        if (!carts.length) return carts as (Cart & { product?: Product })[];
+        return this.findWithProducts({ userId });
+    }
 
-        const productIds = Array.from(
-            new Set(
-                carts
-                    .map((cart) => this.normalizeId(cart.productId))
-                    .filter((id): id is string => Boolean(id)),
-            ),
-        );
+    async findByUserStore(userId: string, storeId: string): Promise<(Cart & { product?: Product })[]> {
+        return this.findWithProducts({ userId, storeId });
+    }
 
-        const products = await this.productModel
-            .find({ _id: { $in: productIds } })
-            .lean()
-            .exec();
-        const productMap = new Map(products.map((product) => [product._id?.toString() ?? '', product]));
+    async getCartSummary(userId: string, storeId: string): Promise<CartSummaryDto> {
+        const carts = await this.findWithProducts({ userId, storeId });
+        const products = carts.map((cart) => this.mapToProductSummary(cart));
 
-        return carts.map((cart) => ({
-            ...cart,
-            product: productMap.get(this.normalizeId(cart.productId) ?? ''),
-        }));
+        const totalPrice = carts.reduce((sum, cart) => sum + this.toNumber(cart.totalPrice), 0);
+        const totalMrp = carts.reduce((sum, cart) => {
+            const mrpPerItem = this.determineMrpPerItem(cart);
+            return sum + mrpPerItem * (cart.quantity ?? 0);
+        }, 0);
+
+        const { deliveryCharge, handlingCharge, deliveryTime } = await this.loadCharges(storeId);
+        const deliveryChargeNum = this.parseNumber(deliveryCharge);
+        const handlingChargeNum = this.parseNumber(handlingCharge);
+        const totalBill = totalPrice + deliveryChargeNum + handlingChargeNum;
+
+        const userAddressId = this.extractFirstValue(carts, (cart) => cart.userAddressId ?? cart.addressId);
+        const deliveryLocationId = this.extractFirstValue(carts, (cart) => cart.deliveryLocationId);
+        const legacyAddressId = this.extractFirstValue(carts, (cart) => cart.addressId);
+
+        return {
+            deliveryTime,
+            deliveryCharge,
+            handlingCharge,
+            TotalSaving: this.formatAmount(totalMrp - totalPrice),
+            TatalBill: this.formatAmount(totalBill),
+            userId: String(userId),
+            storeId: String(storeId),
+            userAddressId,
+            deliveryLocationId,
+            addressId: legacyAddressId,
+            products,
+        };
     }
 
     async findOne(id: string): Promise<Cart & Document> {
@@ -173,6 +213,108 @@ export class CartService {
             storeId: params.storeId,
         });
         return { count };
+    }
+
+    private async findWithProducts(query: FilterQuery<Cart>): Promise<(Cart & { product?: Product })[]> {
+        const carts = await this.cartModel.find(query).lean().exec();
+        if (!carts.length) return carts as (Cart & { product?: Product })[];
+
+        const productIds = Array.from(
+            new Set(
+                carts
+                    .map((cart) => this.normalizeId(cart.productId))
+                    .filter((id): id is string => Boolean(id)),
+            ),
+        );
+
+        const products = await this.productModel
+            .find({ _id: { $in: productIds } })
+            .lean()
+            .exec();
+        const productMap = new Map(products.map((product) => [product._id?.toString() ?? '', product]));
+
+        return carts.map((cart) => ({
+            ...cart,
+            product: productMap.get(this.normalizeId(cart.productId) ?? ''),
+        }));
+    }
+
+    private mapToProductSummary(cart: Cart & { product?: Product }): CartProductSummaryDto {
+        const product = cart.product;
+        const productPrice = this.toNumber(product?.price ?? cart.unitPrice);
+        const mrpValue = this.toNumber(product?.mrp ?? productPrice);
+
+        const id = String((cart as any)._id ?? (cart as any).id ?? '');
+        return {
+            _id: id || '',
+            isActive: true,
+            subcategoryId: cart.subcategoryId,
+            productId: String(cart.productId),
+            name: product?.name,
+            description: product?.description,
+            price: productPrice,
+            productImage: product?.productImage,
+            selectedQuantity: cart.quantity ?? 0,
+            availableQuantity: this.toNumber(product?.quantity),
+            mrp: mrpValue,
+            totalPrice: this.toNumber(cart.totalPrice),
+        };
+    }
+
+    private determineMrpPerItem(cart: Cart & { product?: Product }): number {
+        const product = cart.product;
+        const productPrice = this.toNumber(product?.price ?? cart.unitPrice);
+        return this.toNumber(product?.mrp ?? productPrice);
+    }
+
+    private async loadCharges(storeId: string): Promise<{
+        deliveryCharge: string;
+        handlingCharge: string;
+        deliveryTime: string;
+    }> {
+        const [deliveryCharge, handlingCharge, deliveryTime] = await Promise.all([
+            this.fetchSettingValue(storeId, 'DLC'),
+            this.fetchSettingValue(storeId, 'HDC'),
+            this.fetchSettingValue(storeId, 'DTIME'),
+        ]);
+        return { deliveryCharge, handlingCharge, deliveryTime };
+    }
+
+    private async fetchSettingValue(storeId: string, key: string): Promise<string> {
+        const setting = await this.appSettingsService.findByKeyWithFallback({ key, storeId });
+        if (!setting || setting.value === undefined || setting.value === null) {
+            return '0';
+        }
+        return String(setting.value);
+    }
+
+    private extractFirstValue<T>(items: T[], selector: (item: T) => string | undefined | null): string | undefined {
+        for (const item of items) {
+            const value = selector(item);
+            if (value !== undefined && value !== null) {
+                return String(value);
+            }
+        }
+        return undefined;
+    }
+
+    private parseNumber(value: string): number {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    private formatAmount(value: number): string {
+        if (!Number.isFinite(value)) return '0';
+        const formatted = value.toFixed(2);
+        if (formatted.endsWith('.00')) {
+            return formatted.slice(0, -3);
+        }
+        return formatted;
+    }
+
+    private toNumber(value: unknown): number {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : 0;
     }
 
     private normalizeId(value: unknown): string | null {

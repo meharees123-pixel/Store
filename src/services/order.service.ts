@@ -5,11 +5,13 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { CreateOrderDto, UpdateOrderDto } from '../dto/order.dto';
+import { CreateOrderDto, UpdateOrderDto, OrderSummaryDto } from '../dto/order.dto';
+import { CartProductSummaryDto } from '../dto/cart.dto';
 import { Order } from '../models/order.model';
 import { Cart } from '../models/cart.model';
 import { Product } from '../models/product.model';
 import { OrderStatus } from '../constants/order-status';
+import { AppSettingsService } from './app-settings.service';
 
 @Injectable()
 export class OrderService {
@@ -20,6 +22,7 @@ export class OrderService {
     private readonly cartModel: Model<Cart & Document>,
     @InjectModel(Product.name)
     private readonly productModel: Model<Product & Document>,
+    private readonly appSettingsService: AppSettingsService,
   ) {}
 
   async create(dto: CreateOrderDto): Promise<Order & Document> {
@@ -76,8 +79,10 @@ export class OrderService {
     return this.orderModel.find().exec();
   }
 
-  async findByUser(userId: string): Promise<Order[]> {
-    return this.orderModel.find({ userId }).exec();
+  async findByUser(userId: string): Promise<OrderSummaryDto[]> {
+    const orders = await this.orderModel.find({ userId }).lean().exec();
+    if (!orders.length) return [];
+    return Promise.all(orders.map((order) => this.buildOrderSummary(order)));
   }
 
   async findByStore(storeId: string): Promise<Order[]> {
@@ -193,5 +198,127 @@ export class OrderService {
   async delete(id: string): Promise<{ deleted: boolean }> {
     const deleted = await this.orderModel.findByIdAndDelete(id).exec();
     return { deleted: !!deleted };
+  }
+
+  private async buildOrderSummary(order: Order & { _id: any; items: any[] }): Promise<OrderSummaryDto> {
+    const items = Array.isArray(order.items) ? order.items : [];
+    const productIds = Array.from(
+      new Set(
+        items
+          .map((item) => this.normalizeId((item as any).productId))
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+
+    const products = productIds.length
+      ? await this.productModel.find({ _id: { $in: productIds } }).lean().exec()
+      : [];
+    const productMap = new Map(products.map((product) => [product._id?.toString() ?? '', product]));
+
+    const summaryProducts = items.map((item) => this.mapOrderItemToProduct(item, productMap));
+
+    const totalPrice = summaryProducts.reduce((sum, item) => sum + this.toNumber(item.totalPrice), 0);
+    const totalMrp = summaryProducts.reduce(
+      (sum, item) => sum + this.toNumber(item.mrp ?? item.price) * this.toNumber(item.selectedQuantity),
+      0,
+    );
+
+    const { deliveryCharge, handlingCharge, deliveryTime } = await this.loadCharges(String(order.storeId));
+    const deliveryChargeNum = this.parseNumber(deliveryCharge);
+    const handlingChargeNum = this.parseNumber(handlingCharge);
+    const totalBill = totalPrice + deliveryChargeNum + handlingChargeNum;
+
+    return {
+      orderId: String(order._id),
+      userId: String(order.userId),
+      storeId: String(order.storeId),
+      userAddressId: order.userAddressId ? String(order.userAddressId) : undefined,
+      deliveryLocationId: order.deliveryLocationId ? String(order.deliveryLocationId) : undefined,
+      deliveryTime,
+      deliveryCharge,
+      handlingCharge,
+      TotalSaving: this.formatAmount(totalMrp - totalPrice),
+      TatalBill: this.formatAmount(totalBill),
+      products: summaryProducts,
+    };
+  }
+
+  private mapOrderItemToProduct(item: any, productMap: Map<string, Product>): CartProductSummaryDto {
+    const productId = this.normalizeId(item.productId) ?? '';
+    const productDetail = productMap.get(productId);
+    const quantity = this.toNumber(item.quantity);
+    const price = this.toNumber(item.unitPrice ?? productDetail?.price);
+    const mrp = this.toNumber(productDetail?.mrp ?? item.mrp ?? price);
+    const availableQty = this.toNumber(productDetail?.quantity);
+
+    const itemId =
+      this.normalizeId((item as any)._id) ??
+      productId ??
+      this.normalizeId((item as any).id) ??
+      '';
+
+    return {
+      _id: itemId || '',
+      isActive: true,
+      subcategoryId: item.subcategoryId,
+      productId,
+      name: productDetail?.name ?? item.name,
+      description: productDetail?.description ?? item.description,
+      price,
+      productImage: productDetail?.productImage,
+      selectedQuantity: quantity,
+      availableQuantity: availableQty,
+      mrp,
+      totalPrice: this.toNumber(item.totalPrice ?? price * quantity),
+    };
+  }
+
+  private async loadCharges(storeId: string): Promise<{
+    deliveryCharge: string;
+    handlingCharge: string;
+    deliveryTime: string;
+  }> {
+    const [deliveryCharge, handlingCharge, deliveryTime] = await Promise.all([
+      this.fetchSettingValue(storeId, 'DLC'),
+      this.fetchSettingValue(storeId, 'HDC'),
+      this.fetchSettingValue(storeId, 'DTIME'),
+    ]);
+    return { deliveryCharge, handlingCharge, deliveryTime };
+  }
+
+  private async fetchSettingValue(storeId: string, key: string): Promise<string> {
+    const setting = await this.appSettingsService.findByKeyWithFallback({ key, storeId });
+    if (!setting || setting.value === undefined || setting.value === null) {
+      return '0';
+    }
+    return String(setting.value);
+  }
+
+  private parseNumber(value: string): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  private toNumber(value: unknown): number {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  private formatAmount(value: number): string {
+    if (!Number.isFinite(value)) return '0';
+    const formatted = value.toFixed(2);
+    if (formatted.endsWith('.00')) {
+      return formatted.slice(0, -3);
+    }
+    return formatted;
+  }
+
+  private normalizeId(value: unknown): string | null {
+    if (!value) return null;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object' && value !== null && 'toString' in value) {
+      return (value as { toString(): string }).toString();
+    }
+    return String(value);
   }
 }
