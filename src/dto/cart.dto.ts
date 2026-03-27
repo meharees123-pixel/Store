@@ -102,6 +102,9 @@ export class CartSummaryDto {
     @ApiProperty({ required: false })
     userAddressId?: string;
 
+    @ApiProperty({ required: false, description: 'Computed full address string for the selected user address' })
+    userAddressFull?: string;
+
     @ApiProperty({ required: false })
     deliveryLocationId?: string;
 

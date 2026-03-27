@@ -63,6 +63,21 @@ export class OrderResponseDto {
   @ApiProperty({ example: 99.99 })
   totalAmount: number;
 
+  @ApiProperty()
+  deliveryTime: string;
+
+  @ApiProperty()
+  deliveryCharge: string;
+
+  @ApiProperty()
+  handlingCharge: string;
+
+  @ApiProperty()
+  TotalSaving: string;
+
+  @ApiProperty()
+  TatalBill: string;
+
   @ApiProperty({ type: [Object] })
   items: any[];
 
@@ -91,6 +106,9 @@ export class OrderSummaryDto {
 
   @ApiProperty({ required: false })
   deliveryLocationId?: string;
+
+  @ApiProperty({ required: false, description: 'Full address line for the selected user address' })
+  userAddressFull?: string;
 
   @ApiProperty()
   deliveryTime: string;

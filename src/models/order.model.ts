@@ -36,6 +36,26 @@ export class Order extends AuditModel {
   @ApiProperty({ description: 'Cart items snapshot at time of order' })
   @Prop({ type: [Object], required: true })
   items: any[];
+
+  @ApiProperty()
+  @Prop()
+  deliveryTime?: string;
+
+  @ApiProperty()
+  @Prop()
+  deliveryCharge?: string;
+
+  @ApiProperty()
+  @Prop()
+  handlingCharge?: string;
+
+  @ApiProperty()
+  @Prop()
+  TotalSaving?: string;
+
+  @ApiProperty()
+  @Prop()
+  TatalBill?: string;
 }
 
 export type OrderDocument = Order & Document;

@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Document, Model } from 'mongoose';
 import { CreateOrderDto, UpdateOrderDto, OrderSummaryDto } from '../dto/order.dto';
 import { CartProductSummaryDto } from '../dto/cart.dto';
 import { Order } from '../models/order.model';
@@ -12,6 +12,8 @@ import { Cart } from '../models/cart.model';
 import { Product } from '../models/product.model';
 import { OrderStatus } from '../constants/order-status';
 import { AppSettingsService } from './app-settings.service';
+import { UserAddressService } from './user-address.service';
+import { UserAddress } from '../models/user-address.model';
 
 @Injectable()
 export class OrderService {
@@ -23,6 +25,7 @@ export class OrderService {
     @InjectModel(Product.name)
     private readonly productModel: Model<Product & Document>,
     private readonly appSettingsService: AppSettingsService,
+    private readonly userAddressService: UserAddressService,
   ) {}
 
   async create(dto: CreateOrderDto): Promise<Order & Document> {
@@ -38,6 +41,7 @@ export class OrderService {
       throw new NotFoundException('No cart items found for this user and store');
     }
 
+    const productCache = new Map<string, Product & Document>();
     // Validate and update product quantities
     for (const item of cartItems) {
       const product = await this.productModel.findById(item.productId).exec();
@@ -54,9 +58,36 @@ export class OrderService {
 
       product.quantity -= item.quantity;
       await product.save();
+
+      const normalizedId = this.normalizeId(product._id) ?? '';
+      if (normalizedId) productCache.set(normalizedId, product);
     }
 
     const totalAmount = cartItems.reduce((sum, item) => sum + item.totalPrice, 0);
+    const enrichedItems = cartItems.map((item) => {
+      const plain: any = item.toObject ? item.toObject() : { ...item };
+      const productDetail = productCache.get(this.normalizeId(item.productId) ?? '');
+      const computedPrice = this.toNumber(productDetail?.price ?? plain.unitPrice);
+      const computedMrp = this.toNumber(productDetail?.mrp ?? productDetail?.price ?? computedPrice);
+      plain.productName = productDetail?.name;
+      plain.productDescription = productDetail?.description;
+      plain.productImage = productDetail?.productImage;
+      plain.price = computedPrice;
+      plain.mrp = computedMrp;
+      plain.availableQuantity = this.toNumber(productDetail?.quantity);
+      return plain;
+    });
+
+    const totalMrp = enrichedItems.reduce(
+      (sum, item) => sum + this.toNumber(item.mrp ?? item.price) * this.toNumber(item.quantity),
+      0,
+    );
+
+    const charges = await this.loadCharges(dto.storeId);
+    const totalSaving = this.formatAmount(totalMrp - totalAmount);
+    const totalBill = this.formatAmount(
+      totalAmount + this.parseNumber(charges.deliveryCharge) + this.parseNumber(charges.handlingCharge),
+    );
 
     const order = await this.orderModel.create({
       userId: dto.userId,
@@ -64,7 +95,12 @@ export class OrderService {
       deliveryLocationId: dto.deliveryLocationId,
       storeId: dto.storeId,
       totalAmount,
-      items: cartItems,
+      deliveryTime: charges.deliveryTime,
+      deliveryCharge: charges.deliveryCharge,
+      handlingCharge: charges.handlingCharge,
+      TotalSaving: totalSaving,
+      TatalBill: totalBill,
+      items: enrichedItems,
       status: OrderStatus.PENDING,
     });
 
@@ -202,31 +238,24 @@ export class OrderService {
 
   private async buildOrderSummary(order: Order & { _id: any; items: any[] }): Promise<OrderSummaryDto> {
     const items = Array.isArray(order.items) ? order.items : [];
-    const productIds = Array.from(
-      new Set(
-        items
-          .map((item) => this.normalizeId((item as any).productId))
-          .filter((id): id is string => Boolean(id)),
-      ),
-    );
+    const summaryProducts: CartProductSummaryDto[] = items.map((item) => this.mapOrderItemToProduct(item));
 
-    const products = productIds.length
-      ? await this.productModel.find({ _id: { $in: productIds } }).lean().exec()
-      : [];
-    const productMap = new Map(products.map((product) => [product._id?.toString() ?? '', product]));
-
-    const summaryProducts = items.map((item) => this.mapOrderItemToProduct(item, productMap));
-
-    const totalPrice = summaryProducts.reduce((sum, item) => sum + this.toNumber(item.totalPrice), 0);
+    const totalPrice = this.toNumber(order.totalAmount);
     const totalMrp = summaryProducts.reduce(
       (sum, item) => sum + this.toNumber(item.mrp ?? item.price) * this.toNumber(item.selectedQuantity),
       0,
     );
 
-    const { deliveryCharge, handlingCharge, deliveryTime } = await this.loadCharges(String(order.storeId));
-    const deliveryChargeNum = this.parseNumber(deliveryCharge);
-    const handlingChargeNum = this.parseNumber(handlingCharge);
-    const totalBill = totalPrice + deliveryChargeNum + handlingChargeNum;
+    const fallbackCharges = await this.loadCharges(String(order.storeId));
+    const deliveryCharge = order.deliveryCharge ?? fallbackCharges.deliveryCharge;
+    const handlingCharge = order.handlingCharge ?? fallbackCharges.handlingCharge;
+    const deliveryTime = order.deliveryTime ?? fallbackCharges.deliveryTime;
+    const totalSaving = order.TotalSaving ?? this.formatAmount(totalMrp - totalPrice);
+    const totalBill = order.TatalBill
+      ? order.TatalBill
+      : this.formatAmount(totalPrice + this.parseNumber(deliveryCharge) + this.parseNumber(handlingCharge));
+
+    const userAddressFull = await this.resolveAddressFull(order.userAddressId);
 
     return {
       orderId: String(order._id),
@@ -234,27 +263,26 @@ export class OrderService {
       storeId: String(order.storeId),
       userAddressId: order.userAddressId ? String(order.userAddressId) : undefined,
       deliveryLocationId: order.deliveryLocationId ? String(order.deliveryLocationId) : undefined,
+      userAddressFull,
       deliveryTime,
       deliveryCharge,
       handlingCharge,
-      TotalSaving: this.formatAmount(totalMrp - totalPrice),
-      TatalBill: this.formatAmount(totalBill),
+      TotalSaving: totalSaving,
+      TatalBill: totalBill,
       products: summaryProducts,
     };
   }
 
-  private mapOrderItemToProduct(item: any, productMap: Map<string, Product>): CartProductSummaryDto {
+  private mapOrderItemToProduct(item: any): CartProductSummaryDto {
     const productId = this.normalizeId(item.productId) ?? '';
-    const productDetail = productMap.get(productId);
     const quantity = this.toNumber(item.quantity);
-    const price = this.toNumber(item.unitPrice ?? productDetail?.price);
-    const mrp = this.toNumber(productDetail?.mrp ?? item.mrp ?? price);
-    const availableQty = this.toNumber(productDetail?.quantity);
-
+    const price = this.toNumber(item.price ?? item.unitPrice);
+    const mrp = this.toNumber(item.mrp ?? price);
+    const availableQty = this.toNumber(item.availableQuantity);
     const itemId =
       this.normalizeId((item as any)._id) ??
-      productId ??
       this.normalizeId((item as any).id) ??
+      productId ??
       '';
 
     return {
@@ -262,10 +290,10 @@ export class OrderService {
       isActive: true,
       subcategoryId: item.subcategoryId,
       productId,
-      name: productDetail?.name ?? item.name,
-      description: productDetail?.description ?? item.description,
+      name: item.productName ?? item.name,
+      description: item.productDescription ?? item.description,
       price,
-      productImage: productDetail?.productImage,
+      productImage: item.productImage,
       selectedQuantity: quantity,
       availableQuantity: availableQty,
       mrp,
@@ -320,5 +348,23 @@ export class OrderService {
       return (value as { toString(): string }).toString();
     }
     return String(value);
+  }
+
+  private async resolveAddressFull(addressId?: string): Promise<string | undefined> {
+    if (!addressId) return undefined;
+    try {
+      const address = await this.userAddressService.findOne(addressId);
+      return this.buildFullAddress(address);
+    } catch {
+      return undefined;
+    }
+  }
+
+  private buildFullAddress(address?: UserAddress | null): string | undefined {
+    if (!address) return undefined;
+    const parts = [address.street, address.city, address.state, address.country]
+      .map((value) => String(value || '').trim())
+      .filter((value) => value.length > 0);
+    return parts.length ? parts.join(', ') : undefined;
   }
 }

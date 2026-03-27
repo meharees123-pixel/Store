@@ -50,6 +50,28 @@ export class AppSettingsController {
     return this.appSettingsService.findAll();
   }
 
+  @Get('value')
+  @ApiOperation({ summary: 'Get a single setting value by key (with optional store scope)' })
+  @ApiQuery({ name: 'key', required: true, description: 'Setting key to look up' })
+  @ApiQuery({ name: 'storeId', required: false, description: 'Optional store ID to scope the result' })
+  @ApiResponse({ status: 200, schema: { properties: { value: { type: 'string', nullable: true } } } })
+  async findValue(
+    @Query('key') key?: string,
+    @Query('storeId') storeId?: string,
+  ) {
+    const trimmedKey = String(key || '').trim();
+    if (!trimmedKey) {
+      throw new BadRequestException('Key is required');
+    }
+
+    const value = await this.appSettingsService.findByKeyWithFallback({
+      key: trimmedKey,
+      storeId: storeId ? String(storeId).trim() : undefined,
+    });
+
+    return { value: value?.value ?? null };
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get app setting by ID' })
   @ApiResponse({ status: 200, type: AppSettingsResponseDto })

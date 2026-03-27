@@ -1,10 +1,12 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { FilterQuery, Model } from 'mongoose';
+import { FilterQuery, Document, Model } from 'mongoose';
 import { CreateCartDto, UpdateCartDto, CartSummaryDto, CartProductSummaryDto } from '../dto/cart.dto';
 import { Cart } from '../models/cart.model';
 import { Product } from '../models/product.model';
+import { UserAddress } from '../models/user-address.model';
 import { AppSettingsService } from './app-settings.service';
+import { UserAddressService } from './user-address.service';
 
 @Injectable()
 export class CartService {
@@ -16,6 +18,8 @@ export class CartService {
         private readonly productModel: Model<Product & Document>,
 
         private readonly appSettingsService: AppSettingsService,
+
+        private readonly userAddressService: UserAddressService,
     ) { }
 
     async create(dto: CreateCartDto): Promise<Cart & Document> {
@@ -104,6 +108,7 @@ export class CartService {
         const userAddressId = this.extractFirstValue(carts, (cart) => cart.userAddressId ?? cart.addressId);
         const deliveryLocationId = this.extractFirstValue(carts, (cart) => cart.deliveryLocationId);
         const legacyAddressId = this.extractFirstValue(carts, (cart) => cart.addressId);
+        const userAddressFull = await this.resolveFullAddress(userAddressId);
 
         return {
             deliveryTime,
@@ -115,6 +120,7 @@ export class CartService {
             storeId: String(storeId),
             userAddressId,
             deliveryLocationId,
+            userAddressFull,
             addressId: legacyAddressId,
             products,
         };
@@ -315,6 +321,29 @@ export class CartService {
     private toNumber(value: unknown): number {
         const parsed = Number(value);
         return Number.isFinite(parsed) ? parsed : 0;
+    }
+
+    private async resolveFullAddress(addressId?: string): Promise<string | undefined> {
+        if (!addressId) return undefined;
+        try {
+            const address = await this.userAddressService.findOne(addressId);
+            return this.buildFullAddress(address);
+        } catch {
+            return undefined;
+        }
+    }
+
+    private buildFullAddress(address?: UserAddress | null): string | undefined {
+        if (!address) return undefined;
+        const parts = [
+            address.street,
+            address.city,
+            address.state,
+            address.country,
+        ]
+            .map((part) => String(part || '').trim())
+            .filter((part) => part.length > 0);
+        return parts.length ? parts.join(', ') : undefined;
     }
 
     private normalizeId(value: unknown): string | null {
