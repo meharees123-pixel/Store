@@ -1,6 +1,6 @@
 import { Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Document, Model, Types } from 'mongoose';
 import {
   CreateAppSettingsDto,
   UpdateAppSettingsDto,

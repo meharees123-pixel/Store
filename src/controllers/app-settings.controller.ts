@@ -11,11 +11,13 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ParseObjectIdPipe } from '../utils/parse-object-id.pipe';
-import { ApiOperation, ApiResponse, ApiTags, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags, ApiParam, ApiQuery, ApiBody } from '@nestjs/swagger';
 import {
   CreateAppSettingsDto,
   UpdateAppSettingsDto,
   AppSettingsResponseDto,
+  AppSettingsValueRequestDto,
+  AppSettingsValueResponseDto,
 } from '../dto/app-settings.dto';
 import { AppSettingsService } from '../services/app-settings.service';
 import { AuthGuard } from 'src/guards/auth.guard';
@@ -54,22 +56,20 @@ export class AppSettingsController {
   @ApiOperation({ summary: 'Get a single setting value by key (with optional store scope)' })
   @ApiQuery({ name: 'key', required: true, description: 'Setting key to look up' })
   @ApiQuery({ name: 'storeId', required: false, description: 'Optional store ID to scope the result' })
-  @ApiResponse({ status: 200, schema: { properties: { value: { type: 'string', nullable: true } } } })
+  @ApiResponse({ status: 200, type: AppSettingsValueResponseDto })
   async findValue(
     @Query('key') key?: string,
     @Query('storeId') storeId?: string,
   ) {
-    const trimmedKey = String(key || '').trim();
-    if (!trimmedKey) {
-      throw new BadRequestException('Key is required');
-    }
+    return this.buildValueResponse(key, storeId);
+  }
 
-    const value = await this.appSettingsService.findByKeyWithFallback({
-      key: trimmedKey,
-      storeId: storeId ? String(storeId).trim() : undefined,
-    });
-
-    return { value: value?.value ?? null };
+  @Post('value')
+  @ApiOperation({ summary: 'Lookup a setting value by key + optional store scope via request body' })
+  @ApiResponse({ status: 200, type: AppSettingsValueResponseDto })
+  @ApiBody({ type: AppSettingsValueRequestDto })
+  findValueByBody(@Body() body: AppSettingsValueRequestDto) {
+    return this.buildValueResponse(body.key, body.storeId);
   }
 
   @Get(':id')
@@ -94,5 +94,20 @@ export class AppSettingsController {
   @ApiResponse({ status: 204, description: 'App setting deleted' })
   delete(@Param('id', new ParseObjectIdPipe()) id: string) {
     return this.appSettingsService.delete(id);
+  }
+
+  private async buildValueResponse(key?: string, storeId?: string) {
+    const trimmedKey = String(key || '').trim();
+    if (!trimmedKey) {
+      throw new BadRequestException('Key is required');
+    }
+
+    const normalizedStoreId = storeId ? String(storeId).trim() : undefined;
+    const setting = await this.appSettingsService.findByKeyWithFallback({
+      key: trimmedKey,
+      storeId: normalizedStoreId,
+    });
+
+    return { value: setting?.value ?? null };
   }
 }

@@ -7,14 +7,14 @@ import {
   Put,
   Delete,
   UseGuards,
+  Query,
 } from '@nestjs/common';
 import { ParseObjectIdPipe } from '../utils/parse-object-id.pipe';
-import { ApiOperation, ApiResponse, ApiTags, ApiParam } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags, ApiParam, ApiQuery } from '@nestjs/swagger';
 import {
   CreateCartDto,
   UpdateCartDto,
   CartResponseDto,
-  CartWithProductResponseDto,
   CartSummaryDto,
 } from '../dto/cart.dto';
 import { CartService } from '../services/cart.service';
@@ -41,11 +41,15 @@ export class CartController {
   }
 
   @Get('user/:userId')
-  @ApiOperation({ summary: 'Get cart items by user ID' })
+  @ApiOperation({ summary: 'Get cart summary for a specific user + store combination' })
   @ApiParam({ name: 'userId', example: '64f1c2d9e4b1a2a3c1d2e3f4' })
-  @ApiResponse({ status: 200, type: [CartWithProductResponseDto] })
-  findByUser(@Param('userId', new ParseObjectIdPipe()) userId: string) {
-    return this.cartService.findByUser(userId);
+  @ApiQuery({ name: 'storeId', required: true, example: '64f1c2d9e4b1a2a3c1d2e3f4' })
+  @ApiResponse({ status: 200, type: CartSummaryDto })
+  findByUser(
+    @Param('userId', new ParseObjectIdPipe()) userId: string,
+    @Query('storeId', new ParseObjectIdPipe()) storeId: string,
+  ) {
+    return this.cartService.getCartSummary(userId, storeId);
   }
 
   @Get('user/:userId/store/:storeId')

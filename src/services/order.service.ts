@@ -238,7 +238,20 @@ export class OrderService {
 
   private async buildOrderSummary(order: Order & { _id: any; items: any[] }): Promise<OrderSummaryDto> {
     const items = Array.isArray(order.items) ? order.items : [];
-    const summaryProducts: CartProductSummaryDto[] = items.map((item) => this.mapOrderItemToProduct(item));
+    const productIds = Array.from(
+      new Set(
+        items
+          .map((item) => this.normalizeId(item.productId))
+          .filter((id): id is string => Boolean(id)),
+      ),
+    );
+    const products = productIds.length
+      ? await this.productModel.find({ _id: { $in: productIds } }).lean().exec()
+      : [];
+    const productMap = new Map(products.map((product) => [product._id?.toString() ?? '', product]));
+    const summaryProducts: CartProductSummaryDto[] = items.map((item) =>
+      this.mapOrderItemToProduct(item, productMap),
+    );
 
     const totalPrice = this.toNumber(order.totalAmount);
     const totalMrp = summaryProducts.reduce(
@@ -273,12 +286,13 @@ export class OrderService {
     };
   }
 
-  private mapOrderItemToProduct(item: any): CartProductSummaryDto {
+  private mapOrderItemToProduct(item: any, productMap: Map<string, Product & Document>): CartProductSummaryDto {
     const productId = this.normalizeId(item.productId) ?? '';
-    const quantity = this.toNumber(item.quantity);
-    const price = this.toNumber(item.price ?? item.unitPrice);
-    const mrp = this.toNumber(item.mrp ?? price);
-    const availableQty = this.toNumber(item.availableQuantity);
+    const quantity = this.toNumber(item.selectedQuantity ?? item.quantity);
+    const productDetail = productMap.get(productId);
+    const price = this.toNumber(item.price ?? item.unitPrice ?? productDetail?.price);
+    const mrp = this.toNumber(item.mrp ?? productDetail?.mrp ?? price);
+    const availableQty = this.toNumber(item.availableQuantity ?? productDetail?.quantity);
     const itemId =
       this.normalizeId((item as any)._id) ??
       this.normalizeId((item as any).id) ??
@@ -287,13 +301,13 @@ export class OrderService {
 
     return {
       _id: itemId || '',
-      isActive: true,
+      isActive: Boolean(item.isActive ?? true),
       subcategoryId: item.subcategoryId,
       productId,
-      name: item.productName ?? item.name,
-      description: item.productDescription ?? item.description,
+      name: item.productName ?? item.name ?? productDetail?.name,
+      description: item.productDescription ?? item.description ?? productDetail?.description,
       price,
-      productImage: item.productImage,
+      productImage: item.productImage ?? productDetail?.productImage,
       selectedQuantity: quantity,
       availableQuantity: availableQty,
       mrp,

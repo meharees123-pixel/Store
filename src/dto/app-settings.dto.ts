@@ -50,3 +50,16 @@ export class AppSettingsResponseDto {
   @ApiProperty()
   isActive: boolean;
 }
+
+export class AppSettingsValueRequestDto {
+  @ApiProperty()
+  key: string;
+
+  @ApiProperty({ required: false, description: 'Optional store scope (omit for global setting)' })
+  storeId?: string;
+}
+
+export class AppSettingsValueResponseDto {
+  @ApiProperty({ description: 'Resolved setting value or null if not found', nullable: true })
+  value: string | null;
+}
