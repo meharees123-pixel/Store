@@ -6,6 +6,9 @@ export class FirebaseLoginDto {
 
   @ApiProperty({ required: false, example: 'Meharees' })
   name?: string;
+
+  @ApiProperty({ required: false, example: 'firebase-remote-token-example' })
+  firebaseToken?: string;
 }
 
 export class FirebaseLogoutDto {

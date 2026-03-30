@@ -101,7 +101,12 @@ export class UserService {
     if (!user) throw new UnauthorizedException('Phone number is not registered');
 
     // Ensure the account is active and has a token to use as Bearer auth for subsequent requests.
-    if (!user.firebaseToken) user.firebaseToken = randomUUID();
+    const trimmedFirebaseToken = dto.firebaseToken?.trim();
+    if (trimmedFirebaseToken) {
+      user.firebaseToken = trimmedFirebaseToken;
+    } else if (!user.firebaseToken) {
+      user.firebaseToken = randomUUID();
+    }
     user.isActive = true;
     if (dto.name) user.name = dto.name;
 
