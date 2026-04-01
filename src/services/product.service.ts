@@ -4,14 +4,10 @@ import {
     NotFoundException,
     BadRequestException,
 } from '@nestjs/common';
-import { Model } from 'mongoose';
+import { Model, Document } from 'mongoose';
 import {
     InjectModel,
 } from '@nestjs/mongoose';
-import {
-    Model as MongooseModel,
-    Document as MongooseDocument,
-} from 'mongoose';
 import {
     Product,
     ProductDocument,
@@ -25,6 +21,7 @@ import { Category } from '../models/category.model';
 import { Subcategory } from '../models/subcategory.model';
 import { GcsStorageService } from './gcs-storage.service';
 import { AppSettingsService } from './app-settings.service';
+import { Cart } from '../models/cart.model';
 
 @Injectable()
 export class ProductService {
@@ -37,6 +34,9 @@ export class ProductService {
 
         @InjectModel(Subcategory.name)
         private readonly subcategoryModel: Model<Subcategory & Document>,
+
+        @InjectModel(Cart.name)
+        private readonly cartModel: Model<Cart & Document>,
 
         private readonly gcsStorage: GcsStorageService,
         private readonly appSettingsService: AppSettingsService,
@@ -130,32 +130,36 @@ export class ProductService {
         return this.productModel.find().exec();
     }
 
-    async findByStoreId(storeId: string): Promise<ProductDocument[]> {
+    async findByStoreId(storeId: string, userId?: string): Promise<any[]> {
         const direct = await this.productModel.find({ storeId }).exec();
-        if (direct.length) return direct;
+        if (!direct.length) {
+            // Legacy fallback if `storeId` was stored as a string in MongoDB.
+            const legacy = await this.productModel
+                .find({ $expr: { $eq: [{ $toString: '$storeId' }, storeId] } } as any)
+                .exec();
+            if (legacy.length) {
+            return this.decorateWithSelectedQuantity(legacy, userId, storeId);
+            }
 
-        // Legacy fallback if `storeId` was stored as a string in MongoDB.
-        const legacy = await this.productModel
-            .find({ $expr: { $eq: [{ $toString: '$storeId' }, storeId] } } as any)
-            .exec();
-        if (legacy.length) return legacy;
+            // Older documents may not have `storeId` at all; fall back to store-scoped categoryIds.
+            const categoryIds = await this.findStoreCategoryIds(String(storeId));
+            if (!categoryIds.length) return [];
 
-        // Older documents may not have `storeId` at all; fall back to store-scoped categoryIds.
-        const categoryIds = await this.findStoreCategoryIds(String(storeId));
-        if (!categoryIds.length) return [];
-
-        const categoryIdStrings = categoryIds.map((id) => String(id));
-        return this.productModel
-            .find({
-                $or: [
-                    { categoryId: { $in: categoryIds as any } },
-                    { categoryId: { $in: categoryIdStrings as any } },
-                ],
-            } as any)
-            .exec();
+            const categoryIdStrings = categoryIds.map((id) => String(id));
+            const fallback = await this.productModel
+                .find({
+                    $or: [
+                        { categoryId: { $in: categoryIds as any } },
+                        { categoryId: { $in: categoryIdStrings as any } },
+                    ],
+                } as any)
+                .exec();
+            return this.decorateWithSelectedQuantity(fallback, userId, storeId);
+        }
+        return this.decorateWithSelectedQuantity(direct, userId, storeId);
     }
 
-    async search(params: { q: string; storeId?: string; limit?: number; skip?: number }): Promise<ProductDocument[]> {
+    async search(params: { q: string; storeId?: string; limit?: number; skip?: number; userId?: string }): Promise<any[]> {
         const q = params.q?.trim();
         if (!q) throw new BadRequestException('q is required');
 
@@ -202,7 +206,12 @@ export class ProductService {
         const regexOr = { $or: [{ name: re }, { description: re }] };
         const regexQuery: any = storeFilter ? { $and: [storeFilter, regexOr] } : regexOr;
 
-        return this.productModel.find(regexQuery).skip(skip).limit(limit).exec();
+        const results = await this.productModel.find(regexQuery).skip(skip).limit(limit).lean().exec();
+        const cartQuantityMap = await this.buildCartQuantityMap(params.userId, params.storeId);
+        return results.map((product) => ({
+            ...product,
+            selectedQuantity: cartQuantityMap.get(this.toIdString(product._id)) ?? 0,
+        }));
     }
 
     async findByCategoryId(
@@ -217,14 +226,20 @@ export class ProductService {
         return this.productModel.find({ subcategoryId }).exec();
     }
 
-    async findByParentId(parentId: string): Promise<ProductDocument[]> {
+    async findByParentId(parentId: string, userId?: string): Promise<any[]> {
         const [category, subcategory] = await Promise.all([
             this.categoryModel.findById(parentId).select('_id').lean().exec(),
             this.subcategoryModel.findById(parentId).select('_id').lean().exec(),
         ]);
 
-        if (category) return this.findByCategoryId(parentId);
-        if (subcategory) return this.findBySubcategoryId(parentId);
+        if (category) {
+            const products = await this.findByCategoryId(parentId);
+            return this.decorateWithSelectedQuantity(products, userId);
+        }
+        if (subcategory) {
+            const products = await this.findBySubcategoryId(parentId);
+            return this.decorateWithSelectedQuantity(products, userId);
+        }
 
         return [];
     }
@@ -310,7 +325,7 @@ export class ProductService {
         return product;
     }
 
-    async getDashboardProducts(storeId: string): Promise<any[]> {
+    async getDashboardProducts(storeId: string, userId?: string): Promise<any[]> {
         const [scoped, global] = await Promise.all([
             this.appSettingsService.findScopedByKey({ key: 'dashboardProductCategories', storeId }),
             this.appSettingsService.findGlobalByKey('dashboardProductCategories'),
@@ -347,7 +362,9 @@ export class ProductService {
                     { categoryId: { $in: categoryIdStrings as any } },
                 ],
             } as any)
+            .lean()
             .exec();
+        const cartQuantityMap = await this.buildCartQuantityMap(userId, storeId);
 
         // Step 4: Group products under their parent category
         const grouped: Record<string, any[]> = {};
@@ -360,7 +377,12 @@ export class ProductService {
             if (mapped) catId = mapped;
 
             if (!grouped[catId]) grouped[catId] = [];
-            grouped[catId].push(product);
+            const productId = this.toIdString(product._id);
+            const withQuantity = {
+                ...product,
+                selectedQuantity: cartQuantityMap.get(productId) ?? 0,
+            };
+            grouped[catId].push(withQuantity);
         }
 
         // Step 5: Build final response
@@ -376,7 +398,7 @@ export class ProductService {
         return result;
     }
 
-    async getDashboardProductsDebug(storeId: string): Promise<{
+    async getDashboardProductsDebug(storeId: string, userId?: string): Promise<{
         storeId: string;
         settingUsed: 'store' | 'global' | 'none';
         scopedSettingId?: string;
@@ -400,7 +422,7 @@ export class ProductService {
                 : 'none';
 
         const codesUsed = scopedCodes ?? globalCodes ?? [];
-        const result = codesUsed.length ? await this.getDashboardProducts(storeId) : [];
+        const result = codesUsed.length ? await this.getDashboardProducts(storeId, userId) : [];
 
         return {
             storeId,
@@ -411,6 +433,49 @@ export class ProductService {
             categoriesCount: result.length,
             result,
         };
+    }
+
+    private async buildCartQuantityMap(userId: string | undefined, storeId?: string): Promise<Map<string, number>> {
+        const map = new Map<string, number>();
+        if (!userId || !storeId) return map;
+
+        const cartItems = await this.cartModel
+            .find({ userId, storeId })
+            .select('productId quantity')
+            .lean()
+            .exec();
+
+        for (const item of cartItems) {
+            const productId = this.toIdString(item.productId);
+            if (!productId) continue;
+            const qty = Number(item.quantity ?? 0);
+            if (!Number.isFinite(qty)) continue;
+            map.set(productId, (map.get(productId) ?? 0) + qty);
+        }
+
+        return map;
+    }
+
+    private toIdString(value: unknown): string {
+        if (!value) return '';
+        if (typeof value === 'string') return value;
+        if (typeof value === 'object' && 'toString' in value) {
+            return (value as { toString(): string }).toString();
+        }
+        return String(value);
+    }
+
+    private async decorateWithSelectedQuantity(items: any[], userId?: string, storeId?: string): Promise<any[]> {
+        if (!items || !items.length) return [];
+        const cartQuantityMap = await this.buildCartQuantityMap(userId, storeId);
+        return items.map((item) => {
+            const plain = item && typeof item.toObject === 'function' ? item.toObject() : item;
+            const id = this.toIdString(plain._id);
+            return {
+                ...plain,
+                selectedQuantity: cartQuantityMap.get(id) ?? 0,
+            };
+        });
     }
 
 }

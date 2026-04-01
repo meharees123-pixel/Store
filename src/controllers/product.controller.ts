@@ -83,11 +83,15 @@ export class ProductController {
      * Get products by store ID
      */
     @Get('store/:storeId')
-    @ApiOperation({ summary: 'Get products by store ID' })
+    @ApiOperation({ summary: 'Get products by store ID (include cart counts when userId is supplied)' })
     @ApiParam({ name: 'storeId', example: '652f1c2d9e4b1a2a3c1d2e3f4' })
+    @ApiQuery({ name: 'userId', required: false, description: 'Optional user ID to include selected quantity' })
     @ApiResponse({ status: 200, type: [ProductResponseDto] })
-    findByStore(@Param('storeId', new ParseObjectIdPipe()) storeId: string) {
-        return this.productService.findByStoreId(storeId);
+    findByStore(
+        @Param('storeId', new ParseObjectIdPipe()) storeId: string,
+        @Query('userId') userId?: string,
+    ) {
+        return this.productService.findByStoreId(storeId, userId);
     }
 
     /**
@@ -99,12 +103,14 @@ export class ProductController {
     @ApiQuery({ name: 'storeId', required: false, example: '652f1c2d9e4b1a2a3c1d2e3f4' })
     @ApiQuery({ name: 'limit', required: false, example: 25 })
     @ApiQuery({ name: 'skip', required: false, example: 0 })
+    @ApiQuery({ name: 'userId', required: false, description: 'Optional user ID to include selected quantity' })
     @ApiResponse({ status: 200, type: [ProductResponseDto] })
     search(
         @Query('q') q: string,
         @Query('storeId') storeId?: string,
         @Query('limit') limit?: string,
         @Query('skip') skip?: string,
+        @Query('userId') userId?: string,
     ) {
         const limitNum = limit !== undefined ? parseInt(String(limit), 10) : undefined;
         const skipNum = skip !== undefined ? parseInt(String(skip), 10) : undefined;
@@ -114,6 +120,7 @@ export class ProductController {
             storeId,
             limit: Number.isFinite(limitNum as any) ? (limitNum as number) : undefined,
             skip: Number.isFinite(skipNum as any) ? (skipNum as number) : undefined,
+            userId,
         });
     }
 
@@ -125,11 +132,15 @@ export class ProductController {
     @ApiParam({
         name: 'id',
         description: 'Category ID or Subcategory ID',
-        example: '68c467b88f1124a8b0fcd2b3', // ðŸ” MongoDB ObjectId format
+        example: '68c467b88f1124a8b0fcd2b3', // Ã°Å¸â€Â MongoDB ObjectId format
     })
+    @ApiQuery({ name: 'userId', required: false, description: 'Optional user ID to include selected quantity' })
     @ApiResponse({ status: 200, type: [ProductResponseDto] })
-    async findByParentId(@Param('id', new ParseObjectIdPipe()) id: string) {
-        const products = await this.productService.findByParentId(id);
+    async findByParentId(
+        @Param('id', new ParseObjectIdPipe()) id: string,
+        @Query('userId') userId?: string,
+    ) {
+        const products = await this.productService.findByParentId(id, userId);
         if (!products.length) {
             throw new NotFoundException('No products found for the provided category/subcategory id');
         }

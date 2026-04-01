@@ -30,6 +30,9 @@ export class ProductDto {
 
   @ApiProperty()
   isActive: boolean;
+
+  @ApiProperty({ description: 'Quantity already selected in cart (if userId provided)', required: false })
+  selectedQuantity?: number;
 }
 
 
@@ -46,6 +49,9 @@ export class ProductResponseDto extends ProductDto {
 
   @ApiProperty()
   updatedAt: Date;
+
+  @ApiProperty({ required: false, description: 'Quantity already selected in cart (if userId provided)' })
+  selectedQuantity?: number;
 }
 
 export class DashboardProductCategoryDto {

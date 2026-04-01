@@ -246,18 +246,20 @@ export class CategoryController {
   }
 
   @Get('dashboard-products/:storeId')
-@ApiOperation({ summary: 'Get dashboard products based on category codes from app settings' })
-@ApiParam({ name: 'storeId', example: '652f1c2d9e4b1a2a3c1d2e3f4' })
-@ApiResponse({ status: 200, type: [DashboardProductCategoryDto] })
-@ApiQuery({ name: 'debug', required: false, description: 'Return debug payload instead of plain list when true' })
-getDashboardProducts(
-  @Param('storeId', new ParseObjectIdPipe()) storeId: string,
-  @Query('debug') debug?: string,
-) {
-  const dbg = String(debug || '').toLowerCase();
-  if (dbg === '1' || dbg === 'true') {
-    return this.productService.getDashboardProductsDebug(storeId);
+  @ApiOperation({ summary: 'Get dashboard products based on category codes from app settings' })
+  @ApiParam({ name: 'storeId', example: '652f1c2d9e4b1a2a3c1d2e3f4' })
+  @ApiResponse({ status: 200, type: [DashboardProductCategoryDto] })
+  @ApiQuery({ name: 'debug', required: false, description: 'Return debug payload instead of plain list when true' })
+  @ApiQuery({ name: 'userId', required: false, description: 'Optional user ID to include cart quantities' })
+  getDashboardProducts(
+    @Param('storeId', new ParseObjectIdPipe()) storeId: string,
+    @Query('debug') debug?: string,
+    @Query('userId') userId?: string,
+  ) {
+    const dbg = String(debug || '').toLowerCase();
+    if (dbg === '1' || dbg === 'true') {
+      return this.productService.getDashboardProductsDebug(storeId, userId);
+    }
+    return this.productService.getDashboardProducts(storeId, userId);
   }
-  return this.productService.getDashboardProducts(storeId);
-}
 }
