@@ -270,6 +270,8 @@ export class OrderService {
 
     const userAddressFull = await this.resolveAddressFull(order.userAddressId);
 
+    const orderDate = this.formatOrderDate(order.createdAt ?? new Date());
+
     return {
       orderId: String(order._id),
       userId: String(order.userId),
@@ -282,6 +284,7 @@ export class OrderService {
       handlingCharge,
       TotalSaving: totalSaving,
       TatalBill: totalBill,
+      orderDate,
       products: summaryProducts,
     };
   }
@@ -380,5 +383,35 @@ export class OrderService {
       .map((value) => String(value || '').trim())
       .filter((value) => value.length > 0);
     return parts.length ? parts.join(', ') : undefined;
+  }
+
+  private formatOrderDate(date: Date | string): string {
+    const parsed = new Date(date);
+    if (Number.isNaN(parsed.getTime())) {
+      return '';
+    }
+    const months = [
+      'JAN',
+      'FEB',
+      'MAR',
+      'APR',
+      'MAY',
+      'JUN',
+      'JUL',
+      'AUG',
+      'SEP',
+      'OCT',
+      'NOV',
+      'DEC',
+    ];
+    const day = String(parsed.getDate()).padStart(2, '0');
+    const month = months[parsed.getMonth()] ?? 'JAN';
+    const year = parsed.getFullYear();
+    let hours = parsed.getHours();
+    const period = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    if (hours === 0) hours = 12;
+    const minute = String(parsed.getMinutes()).padStart(2, '0');
+    return `${day}-${month}-${year} ${String(hours).padStart(2, '0')}:${minute} ${period}`;
   }
 }

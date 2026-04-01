@@ -97,20 +97,30 @@ export class UserService {
     const mobileNumber = dto.mobileNumber?.trim();
     if (!mobileNumber) throw new BadRequestException('mobileNumber is required');
 
-    const user = await this.userModel.findOne({ mobileNumber }).exec();
-    if (!user) throw new UnauthorizedException('Phone number is not registered');
-
-    // Ensure the account is active and has a token to use as Bearer auth for subsequent requests.
     const trimmedFirebaseToken = dto.firebaseToken?.trim();
-    if (trimmedFirebaseToken) {
-      user.firebaseToken = trimmedFirebaseToken;
-    } else if (!user.firebaseToken) {
-      user.firebaseToken = randomUUID();
-    }
-    user.isActive = true;
-    if (dto.name) user.name = dto.name;
 
-    return user.save();
+    const existing = await this.userModel.findOne({ mobileNumber }).exec();
+    if (!existing) {
+      const token = trimmedFirebaseToken || randomUUID();
+      const created = await this.userModel.create({
+        mobileNumber,
+        name: dto.name,
+        firebaseToken: token,
+        isActive: true,
+      });
+      return created;
+    }
+
+    if (trimmedFirebaseToken) {
+      existing.firebaseToken = trimmedFirebaseToken;
+    } else if (!existing.firebaseToken) {
+      existing.firebaseToken = randomUUID();
+    }
+
+    existing.isActive = true;
+    if (dto.name) existing.name = dto.name;
+
+    return existing.save();
   }
 
   async firebaseLoginInfo(dto: FirebaseLoginInfoDto): Promise<UserDocument> {

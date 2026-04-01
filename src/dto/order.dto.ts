@@ -125,6 +125,9 @@ export class OrderSummaryDto {
   @ApiProperty({ description: 'Total bill including delivery and handling charges' })
   TatalBill: string;
 
+  @ApiProperty({ description: 'Order creation timestamp' })
+  orderDate: string;
+
   @ApiProperty({ type: [CartProductSummaryDto] })
   products: CartProductSummaryDto[];
 }
