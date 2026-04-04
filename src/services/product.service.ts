@@ -228,17 +228,22 @@ export class ProductService {
 
     async findByParentId(parentId: string, userId?: string): Promise<any[]> {
         const [category, subcategory] = await Promise.all([
-            this.categoryModel.findById(parentId).select('_id').lean().exec(),
-            this.subcategoryModel.findById(parentId).select('_id').lean().exec(),
+            this.categoryModel.findById(parentId).lean().exec(),
+            this.subcategoryModel.findById(parentId).lean().exec(),
         ]);
 
         if (category) {
             const products = await this.findByCategoryId(parentId);
-            return this.decorateWithSelectedQuantity(products, userId);
+            const storeId = this.extractStoreId(category.storeId);
+            return this.decorateWithSelectedQuantity(products, userId, storeId);
         }
+
         if (subcategory) {
             const products = await this.findBySubcategoryId(parentId);
-            return this.decorateWithSelectedQuantity(products, userId);
+            const parentCategoryId = subcategory.categoryId?.toString?.() ?? String(subcategory.categoryId ?? '');
+            const parentCategory = parentCategoryId ? await this.categoryModel.findById(parentCategoryId).lean().exec() : null;
+            const storeId = this.extractStoreId(parentCategory?.storeId);
+            return this.decorateWithSelectedQuantity(products, userId, storeId);
         }
 
         return [];
@@ -476,6 +481,15 @@ export class ProductService {
                 selectedQuantity: cartQuantityMap.get(id) ?? 0,
             };
         });
+    }
+
+    private extractStoreId(value: unknown): string | undefined {
+        if (!value) return undefined;
+        if (typeof value === 'string') return value;
+        if (typeof value === 'object' && 'toString' in value) {
+            return (value as { toString(): string }).toString();
+        }
+        return String(value);
     }
 
 }
