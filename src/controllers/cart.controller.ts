@@ -112,24 +112,18 @@ export class CartController {
     return this.cartService.findOne(id);
   }
 
-  @Put(':id')
-  @ApiOperation({ summary: 'Update cart item by ID' })
+  @Put(':id?')
+  @ApiOperation({
+    summary:
+      'Update cart item by ID or by userId+storeId+productId when ID is omitted (qty required)',
+  })
+  @ApiParam({ name: 'id', example: '64f1c2d9e4b1a2a3c1d2e3f4', required: false })
   @ApiResponse({ status: 200, type: CartResponseDto })
   update(
-    @Param('id', new ParseObjectIdPipe()) id: string,
+    @Param('id', new ParseObjectIdPipe()) id: string | undefined,
     @Body() dto: UpdateCartDto,
   ) {
     return this.cartService.update(id, dto);
-  }
-
-  @Put()
-  @ApiOperation({
-    summary:
-      'Update cart item by userId + storeId + productId when cartId is not provided (quantity must be supplied)',
-  })
-  @ApiResponse({ status: 200, type: CartResponseDto })
-  updateByKeys(@Body() dto: UpdateCartDto) {
-    return this.cartService.update(undefined, dto);
   }
 
   @Delete(':id')
