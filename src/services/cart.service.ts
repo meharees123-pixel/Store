@@ -130,7 +130,7 @@ export class CartService {
         return this.cartModel.findById(id).exec();
     }
 
-    async update(id: string, dto: UpdateCartDto): Promise<Cart & Document> {
+    async update(id: string | undefined, dto: UpdateCartDto): Promise<Cart & Document> {
         const product = await this.productModel.findById(dto.productId).exec();
 
         if (!product) {
@@ -150,29 +150,32 @@ export class CartService {
             throw new BadRequestException('storeId is required');
         }
 
-        const updatedCart = await this.cartModel.findByIdAndUpdate(
-            id,
-            {
+        const query = id
+            ? { _id: id }
+            : {
                 userId: dto.userId,
                 storeId,
-                userAddressId: dto.userAddressId ?? dto.addressId,
-                deliveryLocationId: dto.deliveryLocationId,
-                addressId: dto.addressId, // legacy
                 productId: dto.productId,
-                quantity: dto.quantity,
-                unitPrice: product.price,
-                totalPrice: product.price * dto.quantity,
-                categoryId: product.categoryId,
-                subcategoryId: product.subcategoryId,
-            },
-            { new: true, runValidators: true },
-        ).exec();
+              };
 
-        if (!updatedCart) {
-            throw new NotFoundException(`Cart item with ID ${id} not found`);
+        const existingCart = await this.cartModel.findOne(query).exec();
+        if (!existingCart) {
+            throw new NotFoundException('Cart item not found');
         }
 
-        return updatedCart;
+        existingCart.userId = dto.userId;
+        existingCart.storeId = storeId;
+        existingCart.userAddressId = dto.userAddressId ?? dto.addressId ?? existingCart.userAddressId;
+        existingCart.deliveryLocationId = dto.deliveryLocationId ?? existingCart.deliveryLocationId;
+        existingCart.addressId = dto.addressId ?? existingCart.addressId;
+        existingCart.productId = dto.productId;
+        existingCart.quantity = dto.quantity;
+        existingCart.unitPrice = product.price;
+        existingCart.totalPrice = product.price * dto.quantity;
+        existingCart.categoryId = product.categoryId;
+        existingCart.subcategoryId = product.subcategoryId;
+
+        return existingCart.save();
     }
 
     async findByStore(storeId: string): Promise<Cart[]> {

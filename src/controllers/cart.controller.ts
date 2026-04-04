@@ -122,6 +122,16 @@ export class CartController {
     return this.cartService.update(id, dto);
   }
 
+  @Put()
+  @ApiOperation({
+    summary:
+      'Update cart item by userId + storeId + productId when cartId is not provided (quantity must be supplied)',
+  })
+  @ApiResponse({ status: 200, type: CartResponseDto })
+  updateByKeys(@Body() dto: UpdateCartDto) {
+    return this.cartService.update(undefined, dto);
+  }
+
   @Delete(':id')
   @ApiOperation({ summary: 'Delete cart item by ID' })
   @ApiResponse({ status: 204, description: 'Cart item deleted' })
